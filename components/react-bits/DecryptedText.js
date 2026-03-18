@@ -21,7 +21,12 @@ export default function DecryptedText({
   const [displayText, setDisplayText] = useState(text);
   const [isHovering, setIsHovering] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
   const containerRef = useRef(null);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const chars = '-./*!"#$ %&()=?@[]{}<>^_~+;:,';
 
@@ -72,7 +77,12 @@ export default function DecryptedText({
       onMouseLeave={() => setIsHovering(false)}
       {...props}
     >
-      <span className={className}>{displayText}</span>
+      <span 
+        className={className}
+        suppressHydrationWarning
+      >
+        {!hasMounted ? text : displayText}
+      </span>
     </span>
   );
 }

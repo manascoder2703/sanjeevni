@@ -1,19 +1,22 @@
 'use client';
+
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   User, Camera, Phone, Calendar, Droplets, MapPin, AlertCircle,
-  Stethoscope, LogOut, Save, ChevronLeft, Shield
+  Stethoscope, LogOut, Save, ChevronLeft, Shield, Sparkles,
+  Heart, Activity, Thermometer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const GENDERS = ['male', 'female', 'other'];
 
 export default function PatientProfile() {
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, refreshUser } = useAuth();
   const router = useRouter();
   const fileInputRef = useRef(null);
 
@@ -26,9 +29,11 @@ export default function PatientProfile() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) { router.push('/login'); return; }
-    fetch('/api/profile/patient')
-      .then(r => r.json())
-      .then(data => {
+    
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch('/api/profile/patient');
+        const data = await res.json();
         if (data.user) {
           const u = data.user;
           setForm({
@@ -42,8 +47,14 @@ export default function PatientProfile() {
             avatar: u.avatar || '',
           });
         }
+      } catch (err) {
+        console.error('Failed to fetch profile:', err);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+    
+    fetchProfile();
   }, [user, authLoading]);
 
   const handleImageChange = (e) => {
@@ -59,7 +70,7 @@ export default function PatientProfile() {
   };
 
   const handleSave = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setSaving(true);
     try {
       const res = await fetch('/api/profile/patient', {
@@ -69,10 +80,20 @@ export default function PatientProfile() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save');
-      // Update localStorage
-      const stored = JSON.parse(localStorage.getItem('sanjeevni_user') || '{}');
-      localStorage.setItem('sanjeevni_user', JSON.stringify({ ...stored, name: form.name, avatar: form.avatar }));
-      toast.success('Profile updated!');
+      
+      // Update local context for real-time sidebar/global sync
+      await refreshUser();
+      
+      toast.success('Profile updated successfully!', {
+        icon: '💎',
+        style: {
+          borderRadius: '16px',
+          background: 'rgba(255, 255, 255, 0.1)',
+          color: '#fff',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+        }
+      });
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -80,146 +101,226 @@ export default function PatientProfile() {
     }
   };
 
-  if (!user) return null;
+  if (!user && !authLoading) return null;
 
   const initials = form.name?.[0]?.toUpperCase() || '?';
 
-  return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex' }}>
-      {/* Sidebar */}
-      <aside style={{ width: 240, background: 'rgba(15,23,42,0.95)', borderRight: '1px solid var(--border)', padding: '24px 16px', position: 'sticky', top: 0, height: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32, paddingLeft: 8 }}>
-          <div style={{ background: 'linear-gradient(135deg,#0ea5e9,#06b6d4)', padding: 7, borderRadius: 9 }}><Stethoscope size={16} color="white" /></div>
-          <span style={{ fontWeight: 800, fontSize: 18, background: 'linear-gradient(135deg,#0ea5e9,#06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Sanjeevni</span>
-        </div>
-        <div style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: 12, padding: 16, marginBottom: 24 }}>
-          {form.avatar
-            ? <img src={form.avatar} alt="avatar" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', marginBottom: 8 }} />
-            : <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,#0ea5e9,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: 'white', marginBottom: 8 }}>{initials}</div>
-          }
-          <p style={{ fontWeight: 600, fontSize: 14 }}>{user.name}</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Patient</p>
-        </div>
-        <nav style={{ flex: 1 }}>
-          {[
-            { icon: <Calendar size={18} />, label: 'My Appointments', href: '/dashboard/patient' },
-            { icon: <Stethoscope size={18} />, label: 'Find Doctors', href: '/doctors' },
-            { icon: <User size={18} />, label: 'My Profile', href: '/dashboard/patient/profile' },
-          ].map((item) => (
-            <Link key={item.label} href={item.href} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, textDecoration: 'none', marginBottom: 4, transition: 'all 0.2s', background: item.href === '/dashboard/patient/profile' ? 'rgba(14,165,233,0.1)' : 'transparent', color: item.href === '/dashboard/patient/profile' ? 'var(--accent)' : 'var(--text-muted)' }}>
-              {item.icon}{item.label}
-            </Link>
-          ))}
-        </nav>
-        <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 10, background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', width: '100%', fontSize: 14 }}>
-          <LogOut size={16} /> Sign Out
-        </button>
-      </aside>
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
 
-      {/* Main */}
-      <main style={{ flex: 1, padding: '32px', overflowY: 'auto', maxWidth: 800 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
-          <Link href="/dashboard/patient" style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', textDecoration: 'none' }}><ChevronLeft size={20} /></Link>
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 800 }}>My Profile</h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 2 }}>Manage your personal and medical information</p>
-          </div>
-        </div>
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { y: 0, opacity: 1 }
+  };
+
+  return (
+    <div className="w-full relative min-h-[calc(100vh-150px)] flex flex-col items-center justify-center p-4">
+      <style jsx global>{`
+        .premium-input {
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 14px;
+          padding: 12px 18px;
+          color: white;
+          width: 100%;
+          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+          font-size: 14px;
+          backdrop-filter: blur(10px);
+        }
+        .premium-input:focus {
+          outline: none;
+          border-color: rgba(255, 255, 255, 0.3);
+          background: rgba(255, 255, 255, 0.04);
+          box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+        }
+        .glass-card-new {
+          background: rgba(255, 255, 255, 0.01);
+          backdrop-filter: blur(30px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 24px;
+          position: relative;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .field-label {
+          font-size: 11px;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.4);
+          margin-bottom: 8px;
+          margin-left: 4px;
+          display: block;
+        }
+      `}</style>
+
+      <motion.main 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="max-w-5xl w-full space-y-10 py-12 relative z-10"
+      >
+        {/* Header Section */}
+        <motion.div variants={itemVariants} className="flex flex-col items-center text-center space-y-2 mb-10">
+          <h1 className="text-4xl font-bold tracking-tight text-white/90">Health profile</h1>
+        </motion.div>
 
         {loading ? (
-          <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 80 }}>Loading...</p>
+          <div className="flex flex-col items-center justify-center py-24 gap-4">
+            <div className="size-10 border-2 border-white/5 border-t-white animate-spin rounded-full" />
+            <p className="text-white/20 text-[10px] font-medium tracking-widest uppercase">Initializing neural link</p>
+          </div>
         ) : (
-          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            {/* Avatar */}
-            <div className="glass-card" style={{ padding: 28 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}><Camera size={18} /> Profile Photo</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-                <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => fileInputRef.current?.click()}>
-                  {form.avatar
-                    ? <img src={form.avatar} alt="avatar" style={{ width: 96, height: 96, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--accent)' }} />
-                    : <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'linear-gradient(135deg,#0ea5e9,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, fontWeight: 800, color: 'white' }}>{initials}</div>
-                  }
-                  <div style={{ position: 'absolute', bottom: 0, right: 0, background: 'var(--accent)', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg-primary)' }}>
-                    <Camera size={13} color="white" />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+            {/* Left Column (Identity & Core) */}
+            <div className="lg:col-span-4 space-y-8">
+              {/* Identity Card (Horizontal) */}
+              <motion.div variants={itemVariants} className="glass-card-new p-8 flex items-center gap-6">
+                <div 
+                  className="relative cursor-pointer shrink-0"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <div className="size-24 rounded-3xl flex items-center justify-center border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)] overflow-hidden transition-all hover:border-white/30 group">
+                    {form.avatar ? (
+                      <img src={form.avatar} alt="Profile" className="size-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                    ) : (
+                      <div className="size-full bg-white/5 flex items-center justify-center text-3xl font-bold text-white/20">
+                        {initials}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <Camera size={20} className="text-white" />
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <p style={{ fontWeight: 600, marginBottom: 4 }}>Upload a photo</p>
-                  <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 12 }}>JPG, PNG or GIF · Max 1.5 MB</p>
-                  <button type="button" className="btn-secondary" style={{ fontSize: 13, padding: '8px 16px' }} onClick={() => fileInputRef.current?.click()}>
-                    Choose File
-                  </button>
-                  {form.avatar && (
-                    <button type="button" style={{ marginLeft: 8, fontSize: 13, padding: '8px 16px', background: 'none', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', borderRadius: 8, cursor: 'pointer' }} onClick={() => setForm(f => ({ ...f, avatar: '' }))}>
-                      Remove
-                    </button>
-                  )}
+                
+                <div className="flex-1 space-y-1">
+                  <h2 className="text-xl font-bold text-white/90">{form.name || 'Set Name'}</h2>
+                  <div className="text-[11px] text-white/40 font-medium flex items-center gap-2">
+                    <span>{form.bloodGroup || '--'}</span>
+                    <span className="text-white/10">•</span>
+                    <span>Blood group</span>
+                  </div>
                 </div>
-                <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageChange} />
-              </div>
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+              </motion.div>
+
+              {/* Identity Information Section */}
+              <motion.section variants={itemVariants} className="glass-card-new p-10 border border-white/5">
+                <div className="flex items-center gap-3 mb-8">
+                  <User size={16} className="text-white/30" />
+                  <h3 className="text-sm font-semibold text-white/60">Identity link</h3>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <span className="field-label">Registry name</span>
+                    <input 
+                      className="premium-input" 
+                      value={form.name} 
+                      onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                      placeholder="Enter full name"
+                    />
+                  </div>
+                  <div>
+                    <span className="field-label">Biometric ID (phone)</span>
+                    <input 
+                      className="premium-input" 
+                      value={form.phone} 
+                      onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                      placeholder="+91..."
+                    />
+                  </div>
+                  <div>
+                    <span className="field-label">Gender allocation</span>
+                    <select 
+                      className="premium-input"
+                      value={form.gender}
+                      onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}
+                    >
+                      <option value="">Select</option>
+                      {GENDERS.map(g => <option key={g} value={g}>{g.charAt(0).toUpperCase() + g.slice(1)}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <span className="field-label">Timeline of origin</span>
+                    <input 
+                      type="date"
+                      className="premium-input" 
+                      value={form.dob} 
+                      onChange={e => setForm(f => ({ ...f, dob: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </motion.section>
             </div>
 
-            {/* Personal Info */}
-            <div className="glass-card" style={{ padding: 28 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}><User size={18} /> Personal Information</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>Full Name</label>
-                  <input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Your full name" required />
+            {/* Right Column (Clinical & Actions) */}
+            <div className="lg:col-span-8 space-y-8">
+              {/* Clinical Information Section */}
+              <motion.section variants={itemVariants} className="glass-card-new p-10 border border-white/5">
+                <div className="flex items-center gap-3 mb-10">
+                  <Activity size={18} className="text-white/30" />
+                  <h3 className="text-sm font-semibold text-white/60">Clinical metadata</h3>
                 </div>
-                <div>
-                  <label style={labelStyle}>Email (read-only)</label>
-                  <input className="input" value={user.email} disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} />
-                </div>
-                <div>
-                  <label style={labelStyle}><Phone size={13} style={{ display: 'inline', marginRight: 4 }} />Phone Number</label>
-                  <input className="input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+91 98765 43210" />
-                </div>
-                <div>
-                  <label style={labelStyle}><Calendar size={13} style={{ display: 'inline', marginRight: 4 }} />Date of Birth</label>
-                  <input className="input" type="date" value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} max={new Date().toISOString().split('T')[0]} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Gender</label>
-                  <select className="input" value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))} style={{ cursor: 'pointer' }}>
-                    <option value="">Select gender</option>
-                    {GENDERS.map(g => <option key={g} value={g}>{g.charAt(0).toUpperCase() + g.slice(1)}</option>)}
-                  </select>
-                </div>
-              </div>
-            </div>
 
-            {/* Medical Info */}
-            <div className="glass-card" style={{ padding: 28 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}><Shield size={18} /> Medical Information</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div>
-                  <label style={labelStyle}><Droplets size={13} style={{ display: 'inline', marginRight: 4 }} />Blood Group</label>
-                  <select className="input" value={form.bloodGroup} onChange={e => setForm(f => ({ ...f, bloodGroup: e.target.value }))} style={{ cursor: 'pointer' }}>
-                    <option value="">Select blood group</option>
-                    {BLOOD_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-10">
+                  <div className="md:col-span-1">
+                    <span className="field-label">Hematology group</span>
+                    <select 
+                      className="premium-input"
+                      value={form.bloodGroup}
+                      onChange={e => setForm(f => ({ ...f, bloodGroup: e.target.value }))}
+                    >
+                      <option value="">Select</option>
+                      {BLOOD_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </div>
+                  <div className="md:col-span-1">
+                    <span className="field-label">Primary email</span>
+                    <input className="premium-input opacity-40 cursor-not-allowed" value={user.email} disabled />
+                  </div>
+                  <div className="md:col-span-2">
+                    <span className="field-label">Geographic coordinates (address)</span>
+                    <input 
+                      className="premium-input" 
+                      placeholder="Specify your residential locus..."
+                      value={form.address} 
+                      onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <span className="field-label">Sensitive pathologies / allergies</span>
+                    <textarea 
+                      className="premium-input min-h-[160px] resize-none" 
+                      placeholder="Specify critical medical metadata or chronic pathologies..."
+                      value={form.allergies} 
+                      onChange={e => setForm(f => ({ ...f, allergies: e.target.value }))}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label style={labelStyle}><MapPin size={13} style={{ display: 'inline', marginRight: 4 }} />Address</label>
-                  <input className="input" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="City, State" />
-                </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}><AlertCircle size={13} style={{ display: 'inline', marginRight: 4 }} />Known Allergies / Medical Conditions</label>
-                  <textarea className="input" value={form.allergies} onChange={e => setForm(f => ({ ...f, allergies: e.target.value }))} placeholder="e.g. Penicillin allergy, Diabetes Type 2..." rows={3} style={{ resize: 'vertical' }} />
-                </div>
-              </div>
-            </div>
+              </motion.section>
 
-            {/* Save */}
-            <button type="submit" className="btn-primary pulse-glow" disabled={saving} style={{ alignSelf: 'flex-end', padding: '13px 32px', fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Save size={16} /> {saving ? 'Saving...' : 'Save Changes'}
-            </button>
-          </form>
+            {/* Save Button (Centered Rounded Full) */}
+            <div className="lg:col-span-12 flex justify-center pt-10">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleSave}
+                disabled={saving}
+                className="px-24 py-6 rounded-full bg-white/5 hover:bg-white border border-white/10 hover:border-white text-white/80 hover:text-black font-bold text-sm tracking-widest uppercase backdrop-blur-xl shadow-2xl transition-all duration-300 disabled:opacity-30"
+              >
+                {saving ? 'Saving changes...' : 'Save changes'}
+              </motion.button>
+            </div>
+            </div>
+          </div>
         )}
-      </main>
+      </motion.main>
     </div>
   );
 }
-
-const labelStyle = { fontSize: 13, fontWeight: 500, color: 'var(--text-muted)', display: 'block', marginBottom: 6 };

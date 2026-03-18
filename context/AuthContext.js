@@ -1,6 +1,7 @@
 'use client';
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession, signOut as nextAuthSignOut } from 'next-auth/react';
 
 const AuthContext = createContext(null);
 
@@ -8,8 +9,14 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { data: session, status } = useSession();
 
   useEffect(() => {
+    console.log('[AuthContext] Session Status:', status);
+    if (status === 'authenticated') {
+      console.log('[AuthContext] Session Data:', session);
+    }
+    
     const initializeAuth = () => {
       try {
         const stored = localStorage.getItem('sanjeevni_user');
@@ -20,47 +27,125 @@ export function AuthProvider({ children }) {
       } catch (error) {
         console.error('Failed to parse stored user:', error);
       } finally {
-        setLoading(false);
+        if (status !== 'loading') {
+          setLoading(false);
+        }
       }
     };
 
     initializeAuth();
-  }, []);
+  }, [status]);
+
+  useEffect(() => {
+    if (session?.user) {
+      const userData = {
+        name: session.user.name,
+        email: session.user.email,
+        role: session.user.role || 'patient',
+        avatar: session.user.image,
+        id: session.user.id
+      };
+      setUser(userData);
+      localStorage.setItem('sanjeevni_user', JSON.stringify(userData));
+    }
+  }, [session]);
 
   const login = async (email, password) => {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Login failed');
-    setUser(data.user);
-    localStorage.setItem('sanjeevni_user', JSON.stringify(data.user));
-    return data.user;
+    console.log('--- Logging in via AuthContext ---');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      console.log('Login response status:', res.status);
+
+      let data;
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        console.error('Login non-JSON response:', text);
+        return { error: 'Server error: Invalid response format' };
+      }
+
+      if (!res.ok) {
+        console.log('Login failed with message:', data.error);
+        return { error: data.error || 'Login failed' };
+      }
+
+      setUser(data.user);
+      localStorage.setItem('sanjeevni_user', JSON.stringify(data.user));
+      console.log('Login successful for:', data.user.email);
+      return { user: data.user };
+    } catch (error) {
+      console.error('Login fetch error:', error);
+      return { error: 'Network error: Please try again' };
+    }
   };
 
+
   const register = async (formData) => {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Registration failed');
-    setUser(data.user);
-    localStorage.setItem('sanjeevni_user', JSON.stringify(data.user));
-    return data.user;
+    console.log('--- Registering user via AuthContext ---');
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      console.log('Register response status:', res.status);
+      
+      let data;
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+        console.log('Register JSON data:', data);
+      } else {
+        const text = await res.text();
+        console.error('Register non-JSON response:', text);
+        throw new Error(`Server returned non-JSON response (${res.status})`);
+      }
+
+      if (!res.ok) {
+        return { error: data.error || data.details || 'Registration failed' };
+      }
+
+      setUser(data.user);
+      localStorage.setItem('sanjeevni_user', JSON.stringify(data.user));
+      return { user: data.user };
+    } catch (error) {
+      console.error('Registration fetch/logic error:', error);
+      return { error: 'Network error: Please try again' };
+    }
+  };
+
+  const refreshUser = async () => {
+    try {
+      const res = await fetch('/api/profile/patient');
+      const data = await res.json();
+      if (res.ok && data.user) {
+        setUser(data.user);
+        localStorage.setItem('sanjeevni_user', JSON.stringify(data.user));
+      }
+    } catch (error) {
+      console.error('Refresh user error:', error);
+    }
   };
 
   const logout = async () => {
+    if (session) {
+      await nextAuthSignOut({ redirect: false });
+    }
     await fetch('/api/auth/logout', { method: 'POST' });
     localStorage.removeItem('sanjeevni_user');
     window.location.href = '/';
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading: loading || status === 'loading', login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

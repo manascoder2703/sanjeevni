@@ -35,6 +35,14 @@ const onlineDoctors = new Map(); // userId -> Set of socketIds
 io.on('connection', (socket) => {
   console.log(`✅ Client connected: ${socket.id}`);
 
+  // Join personal room for notifications
+  socket.on('identify', ({ userId }) => {
+    if (userId) {
+      socket.join(userId);
+      console.log(`👤 User ${userId} joined their personal notification room`);
+    }
+  });
+
   // Doctor identifies themselves on dashboard entry
   socket.on('doctor-online', async ({ userId }) => {
     socket.isDoctor = true;
@@ -178,6 +186,29 @@ io.on('connection', (socket) => {
     }
     console.log(`❌ Client disconnected: ${socket.id}`);
   });
+});
+
+const bodyParser = require('body-parser');
+app.use(bodyParser.json());
+
+// Internal notification endpoint
+app.post('/internal/notify', (req, res) => {
+  const { userId, notification } = req.body;
+  if (!userId || !notification) {
+    return res.status(400).json({ error: 'userId and notification required' });
+  }
+
+  // Generate an ID for the notification if not provided
+  const notificationId = notification.id || Math.random().toString(36).substr(2, 9);
+  const finalNotification = {
+    ...notification,
+    id: notificationId,
+    timestamp: new Date().toISOString()
+  };
+
+  io.to(userId).emit('new-notification', finalNotification);
+  console.log(`🔔 Notification sent to user ${userId}: ${notification.title}`);
+  res.json({ success: true, notification: finalNotification });
 });
 
 const PORT = process.env.PORT || 3001;

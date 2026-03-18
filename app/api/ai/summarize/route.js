@@ -4,7 +4,7 @@ import { getGeminiModel, SUMMARIZE_SYSTEM_PROMPT } from '@/lib/gemini';
 
 export async function POST(request) {
   try {
-    const user = getUserFromRequest(request);
+    const user = await getUserFromRequest(request);
     if (!user || user.role !== 'doctor') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

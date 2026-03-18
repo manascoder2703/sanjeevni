@@ -1,5 +1,5 @@
 'use client';
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -11,8 +11,20 @@ function RegisterForm() {
   const [role, setRole] = useState(searchParams.get('role') || 'patient');
   const [form, setForm] = useState({ name: '', email: '', password: '', specialization: '', fee: 500, experience: 1, bio: '' });
   const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const { register, user: authUser } = useAuth();
   const router = useRouter();
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  useEffect(() => {
+    if (authUser) {
+      setIsRedirecting(true);
+      const role = authUser.role || 'patient';
+      if (role === 'admin') router.push('/admin');
+      else router.push(`/dashboard/${role}`);
+    }
+  }, [authUser, router]);
+
+  if (isRedirecting) return null;
 
   const specializations = ['Cardiologist', 'Dermatologist', 'Neurologist', 'Pediatrician', 'Psychiatrist', 'Orthopedic', 'General Physician', 'Gynecologist'];
 

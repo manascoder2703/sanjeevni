@@ -9,6 +9,7 @@ export default function ShinyText({
   disabled = false,
   speed = 5,
   className = '',
+  style = {},
   ...props
 }) {
   const animationDuration = `${speed}s`;
@@ -16,7 +17,11 @@ export default function ShinyText({
   return (
     <span
       className={`shiny-text ${disabled ? 'disabled' : ''} ${className}`}
-      style={{ animationDuration }}
+      style={{ 
+        ...style,
+        animationDuration,
+        '--shiny-speed': animationDuration 
+      }}
       {...props}
     >
       {text}

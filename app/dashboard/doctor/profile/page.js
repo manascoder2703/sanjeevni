@@ -102,191 +102,237 @@ export default function DoctorProfile() {
   const initials = form.name?.[0]?.toUpperCase() || '?';
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', display: 'flex' }}>
-      {/* Sidebar */}
-      <aside style={{ width: 240, background: 'rgba(15,23,42,0.95)', borderRight: '1px solid var(--border)', padding: '24px 16px', position: 'sticky', top: 0, height: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32, paddingLeft: 8 }}>
-          <div style={{ background: 'linear-gradient(135deg,#0ea5e9,#06b6d4)', padding: 7, borderRadius: 9 }}><Stethoscope size={16} color="white" /></div>
-          <span style={{ fontWeight: 800, fontSize: 18, background: 'linear-gradient(135deg,#0ea5e9,#06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Sanjeevni</span>
-        </div>
-        <div style={{ background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: 12, padding: 16, marginBottom: 24 }}>
-          {form.avatar
-            ? <img src={form.avatar} alt="avatar" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', marginBottom: 8 }} />
-            : <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,#0ea5e9,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: 'white', marginBottom: 8 }}>{initials}</div>
-          }
-          <p style={{ fontWeight: 600, fontSize: 14 }}>Dr. {user.name}</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>Doctor</p>
-        </div>
-        <nav style={{ flex: 1 }}>
-          {[
-            { icon: <Stethoscope size={18} />, label: 'Dashboard', href: '/dashboard/doctor' },
-            { icon: <User size={18} />, label: 'My Profile', href: '/dashboard/doctor/profile' },
-          ].map((item) => (
-            <Link key={item.label} href={item.href} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10, textDecoration: 'none', marginBottom: 4, transition: 'all 0.2s', background: item.href === '/dashboard/doctor/profile' ? 'rgba(14,165,233,0.1)' : 'transparent', color: item.href === '/dashboard/doctor/profile' ? 'var(--accent)' : 'var(--text-muted)' }}>
-              {item.icon}{item.label}
-            </Link>
-          ))}
-        </nav>
-        <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 10, background: 'none', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', width: '100%', fontSize: 14 }}>
-          <LogOut size={16} /> Sign Out
-        </button>
-      </aside>
+    <div className="w-full relative min-h-[calc(100vh-150px)] flex flex-col items-center justify-center p-4">
+      <style jsx global>{`
+        .premium-input {
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 14px;
+          padding: 12px 18px;
+          color: white;
+          width: 100%;
+          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+          font-size: 14px;
+          backdrop-filter: blur(10px);
+        }
+        .premium-input:focus {
+          outline: none;
+          border-color: rgba(255, 255, 255, 0.3);
+          background: rgba(255, 255, 255, 0.04);
+          box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+        }
+        .glass-card-new {
+          background: rgba(255, 255, 255, 0.01);
+          backdrop-filter: blur(30px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 24px;
+          position: relative;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .field-label {
+          font-size: 11px;
+          font-weight: 600;
+          color: rgba(255, 255, 255, 0.4);
+          margin-bottom: 8px;
+          margin-left: 4px;
+          display: block;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+        }
+      `}</style>
 
-      {/* Main */}
-      <main style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
-        <div style={{ maxWidth: 820, margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
-            <Link href="/dashboard/doctor" style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', textDecoration: 'none' }}><ChevronLeft size={20} /></Link>
-            <div>
-              <h1 style={{ fontSize: 26, fontWeight: 800 }}>Doctor Profile</h1>
-              <p style={{ color: 'var(--text-muted)', fontSize: 14, marginTop: 2 }}>Your professional information shown to patients</p>
-            </div>
+      <main className="max-w-5xl w-full mx-auto py-12 relative z-10 flex flex-col gap-10">
+        <div className="flex items-center gap-6">
+          <Link href="/dashboard/doctor" className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 transition-all text-white/40">
+            <ChevronLeft size={20} />
+          </Link>
+          <div className="flex flex-col gap-1">
+            <h1 className="text-3xl font-bold tracking-tight text-white/90">Clinical identity</h1>
           </div>
+        </div>
 
-          {loading ? (
-            <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 80 }}>Loading...</p>
-          ) : (
-            <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {/* Avatar */}
-              <div className="glass-card" style={{ padding: 28 }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}><Camera size={18} /> Profile Photo</h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-                  <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => fileInputRef.current?.click()}>
-                    {form.avatar
-                      ? <img src={form.avatar} alt="avatar" style={{ width: 96, height: 96, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--accent)' }} />
-                      : <div style={{ width: 96, height: 96, borderRadius: '50%', background: 'linear-gradient(135deg,#0ea5e9,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, fontWeight: 800, color: 'white' }}>{initials}</div>
-                    }
-                    <div style={{ position: 'absolute', bottom: 0, right: 0, background: 'var(--accent)', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg-primary)' }}>
-                      <Camera size={13} color="white" />
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-32 gap-6">
+             <div className="size-12 border-2 border-white/5 border-t-white animate-spin rounded-full shadow-[0_0_20px_rgba(255,255,255,0.05)]" />
+             <p className="text-white/20 text-[10px] font-medium tracking-widest uppercase animate-pulse">Establishing professional sync</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+            {/* Left Column: Profile & Personal */}
+            <div className="lg:col-span-4 space-y-8">
+              {/* Photo Card */}
+              <div className="glass-card-new p-8 border border-white/5">
+                <div className="flex flex-col items-center gap-6">
+                  <div 
+                    className="relative cursor-pointer group"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {form.avatar ? (
+                      <img src={form.avatar} alt="avatar" className="size-32 rounded-3xl object-cover border border-white/10 shadow-2xl transition-transform duration-500 group-hover:scale-105" />
+                    ) : (
+                      <div className="size-32 rounded-3xl bg-white/5 flex items-center justify-center text-4xl font-bold text-white shadow-2xl">{initials}</div>
+                    )}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-3xl transition-opacity">
+                      <Camera size={24} className="text-white" />
                     </div>
                   </div>
-                  <div>
-                    <p style={{ fontWeight: 600, marginBottom: 4 }}>Upload a photo</p>
-                    <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 12 }}>JPG, PNG or GIF · Max 1.5 MB</p>
-                    <button type="button" className="btn-secondary" style={{ fontSize: 13, padding: '8px 16px' }} onClick={() => fileInputRef.current?.click()}>Choose File</button>
+                  
+                  <div className="text-center space-y-2">
+                    <p className="text-white/80 font-semibold text-sm">Professional portrait</p>
+                    <p className="text-white/20 text-[9px] font-medium">JPG, PNG · Max 1.5mb</p>
+                  </div>
+
+                  <div className="flex gap-2 w-full pt-2">
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-[10px] font-bold tracking-widest transition-all">Upload</button>
                     {form.avatar && (
-                      <button type="button" style={{ marginLeft: 8, fontSize: 13, padding: '8px 16px', background: 'none', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', borderRadius: 8, cursor: 'pointer' }} onClick={() => setForm(f => ({ ...f, avatar: '' }))}>Remove</button>
+                      <button type="button" onClick={() => setForm(f => ({ ...f, avatar: '' }))} className="px-4 py-2.5 bg-white/5 hover:bg-red-500 border border-white/10 hover:border-red-500 text-white/40 hover:text-white transition-all"><X size={14} /></button>
                     )}
                   </div>
-                  <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageChange} />
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
                 </div>
               </div>
 
-              {/* Personal Info */}
-              <div className="glass-card" style={{ padding: 28 }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}><User size={18} /> Personal Information</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={labelStyle}>Full Name</label>
-                    <input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Dr. Full Name" required />
+              {/* Basic Personal Info */}
+              <div className="glass-card-new p-10 border border-white/5">
+                <div className="flex items-center gap-3 mb-8">
+                  <User size={16} className="text-white/30" />
+                  <h3 className="text-sm font-semibold text-white/60">Core registry</h3>
+                </div>
+                <div className="space-y-6">
+                  <div>
+                    <label className="field-label">Official name</label>
+                    <input className="premium-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Dr. Enter Name" required />
                   </div>
                   <div>
-                    <label style={labelStyle}>Email (read-only)</label>
-                    <input className="input" value={user.email} disabled style={{ opacity: 0.5, cursor: 'not-allowed' }} />
+                    <label className="field-label">Digital coordinate (email)</label>
+                    <input className="premium-input opacity-40 cursor-not-allowed" value={user.email} disabled />
                   </div>
                   <div>
-                    <label style={labelStyle}><Phone size={13} style={{ display: 'inline', marginRight: 4 }} />Phone Number</label>
-                    <input className="input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+91 98765 43210" />
+                    <label className="field-label">Verified contact</label>
+                    <input className="premium-input" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+91..." />
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Professional Details */}
-              <div className="glass-card" style={{ padding: 28 }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}><Briefcase size={18} /> Professional Details</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {/* Right Column: Professional & Qualifications */}
+            <div className="lg:col-span-8 space-y-8">
+              {/* Professional Specs */}
+              <div className="glass-card-new p-10 border border-white/5">
+                <div className="flex items-center gap-3 mb-10">
+                  <Briefcase size={18} className="text-white/30" />
+                  <h3 className="text-sm font-semibold text-white/60">Clinical expertise</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-10">
                   <div>
-                    <label style={labelStyle}>Specialization</label>
-                    <select className="input" value={form.specialization} onChange={e => setForm(f => ({ ...f, specialization: e.target.value }))} required style={{ cursor: 'pointer' }}>
-                      <option value="">Select specialization</option>
+                    <label className="field-label">Neural specialization</label>
+                    <select className="premium-input" value={form.specialization} onChange={e => setForm(f => ({ ...f, specialization: e.target.value }))} required>
+                      <option value="">Select domain</option>
                       {SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label style={labelStyle}><Briefcase size={13} style={{ display: 'inline', marginRight: 4 }} />Experience (years)</label>
-                    <input className="input" type="number" min="0" max="60" value={form.experience} onChange={e => setForm(f => ({ ...f, experience: e.target.value }))} placeholder="e.g. 5" />
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="field-label">Seniority (yrs)</label>
+                      <input className="premium-input" type="number" min="0" value={form.experience} onChange={e => setForm(f => ({ ...f, experience: e.target.value }))} />
+                    </div>
+                    <div>
+                      <label className="field-label">Protocol fee (₹)</label>
+                      <input className="premium-input" type="number" min="0" value={form.fee} onChange={e => setForm(f => ({ ...f, fee: e.target.value }))} />
+                    </div>
                   </div>
-                  <div>
-                    <label style={labelStyle}><DollarSign size={13} style={{ display: 'inline', marginRight: 4 }} />Consultation Fee (₹)</label>
-                    <input className="input" type="number" min="0" value={form.fee} onChange={e => setForm(f => ({ ...f, fee: e.target.value }))} placeholder="e.g. 500" />
+                  <div className="md:col-span-2">
+                    <label className="field-label">Primary institution / hospital</label>
+                    <input className="premium-input" value={form.hospital} onChange={e => setForm(f => ({ ...f, hospital: e.target.value }))} placeholder="e.g. Center for advanced medicine" />
                   </div>
-                  <div>
-                    <label style={labelStyle}>Hospital / Clinic Name</label>
-                    <input className="input" value={form.hospital} onChange={e => setForm(f => ({ ...f, hospital: e.target.value }))} placeholder="e.g. Apollo Hospitals" />
+                  <div className="md:col-span-2">
+                    <label className="field-label">Geographic presence (address)</label>
+                    <input className="premium-input" value={form.clinicAddress} onChange={e => setForm(f => ({ ...f, clinicAddress: e.target.value }))} placeholder="Specify clinical locus" />
                   </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={labelStyle}><MapPin size={13} style={{ display: 'inline', marginRight: 4 }} />Clinic Address</label>
-                    <input className="input" value={form.clinicAddress} onChange={e => setForm(f => ({ ...f, clinicAddress: e.target.value }))} placeholder="Full clinic address" />
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={labelStyle}><BookOpen size={13} style={{ display: 'inline', marginRight: 4 }} />Bio</label>
-                    <textarea className="input" value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} placeholder="Tell patients about your expertise and approach..." rows={4} style={{ resize: 'vertical' }} />
+                  <div className="md:col-span-2">
+                    <label className="field-label">Professional briefing (bio)</label>
+                    <textarea className="premium-input min-h-[140px] resize-none custom-scrollbar" value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} placeholder="Synthesize your professional approach..." />
                   </div>
                 </div>
               </div>
 
-              {/* Qualifications */}
-              <div className="glass-card" style={{ padding: 28 }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}><BookOpen size={18} /> Qualifications</h2>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                  <input
-                    ref={qualInputRef}
-                    className="input"
-                    value={qualInput}
-                    onChange={e => setQualInput(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addQualification(); } }}
-                    placeholder="e.g. MBBS, MD Cardiology..."
-                    style={{ flex: 1 }}
-                  />
-                  <button type="button" className="btn-secondary" onClick={addQualification} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Plus size={15} /> Add
+              {/* Qualifications & Skills */}
+              <div className="glass-card-new p-10 border border-white/5">
+                <div className="flex items-center gap-3 mb-10">
+                  <BookOpen size={18} className="text-white/30" />
+                  <h3 className="text-sm font-semibold text-white/60">Credential stack</h3>
+                </div>
+                
+                <div className="space-y-8">
+                  <div className="flex gap-4">
+                    <input 
+                      ref={qualInputRef}
+                      className="premium-input flex-1" 
+                      value={qualInput} 
+                      onChange={e => setQualInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addQualification(); } }}
+                      placeholder="Add qualification (e.g. mbbs, fellowship...)" 
+                    />
+                    <button type="button" onClick={addQualification} className="px-8 bg-white/5 hover:bg-white border border-white/10 hover:border-white rounded-2xl text-[10px] font-bold tracking-widest transition-all flex items-center gap-3">
+                      Insert
+                    </button>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-3 min-h-[40px]">
+                    {form.qualifications.map(q => (
+                      <button key={q} type="button" onClick={() => removeQualification(q)} className="group px-4 py-2 bg-white/5 hover:bg-red-500/5 border border-white/10 hover:border-red-500/20 rounded-xl flex items-center gap-3 transition-all">
+                        <span className="text-[11px] font-semibold text-white/40 group-hover:text-red-400">{q}</span>
+                        <X size={12} className="text-white/20 group-hover:text-red-400" />
+                      </button>
+                    ))}
+                    {form.qualifications.length === 0 && <p className="text-white/10 text-[11px] font-medium italic py-2">No credentials initialized</p>}
+                  </div>
+                </div>
+
+                <div className="h-px bg-white/5 my-10" />
+
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3">
+                    <Globe size={16} className="text-white/30" />
+                    <label className="field-label mb-0">Linguistic capabilities</label>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {COMMON_LANGS.map(lang => (
+                      <button key={lang} type="button" onClick={() => toggleLanguage(lang)} className={`px-4 py-2 rounded-xl text-[10px] font-bold tracking-widest transition-all border ${form.languages.includes(lang) ? 'bg-white border-white text-black' : 'bg-white/5 border-white/5 text-white/30 hover:bg-white/10'}`}>
+                        {lang}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Consultation Preference & Save */}
+              <div className="flex flex-col md:flex-row items-center justify-between gap-10">
+                <div className="glass-card-new px-8 py-6 border border-white/5 flex items-center gap-8">
+                  <span className="text-[10px] font-semibold text-white/20 uppercase tracking-widest shrink-0">Consult type:</span>
+                  <div className="flex gap-2">
+                    {CONSULT_TYPES.map(ct => (
+                      <button key={ct} type="button" onClick={() => setForm(f => ({ ...f, consultationType: ct }))} className={`px-5 py-2.5 rounded-xl text-[10px] font-bold tracking-widest transition-all border ${form.consultationType === ct ? 'bg-white/10 border-white/20 text-white' : 'bg-transparent border-transparent text-white/20 hover:text-white/40'}`}>
+                        {ct}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex-1 flex justify-center">
+                  <button type="submit" disabled={saving} className="px-24 py-6 bg-white/5 hover:bg-white border border-white/10 hover:border-white rounded-full shadow-2xl text-white/80 hover:text-black font-bold text-sm tracking-widest uppercase flex items-center justify-center gap-4 backdrop-blur-xl transition-all duration-300 active:scale-95 disabled:opacity-30">
+                    {saving ? 'Saving changes...' : 'Save changes'}
                   </button>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {form.qualifications.map(q => (
-                    <span key={q} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(14,165,233,0.12)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: 20, padding: '5px 12px', fontSize: 13, fontWeight: 500, color: 'var(--accent)' }}>
-                      {q}
-                      <button type="button" onClick={() => removeQualification(q)} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, display: 'flex' }}><X size={12} /></button>
-                    </span>
-                  ))}
-                  {form.qualifications.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No qualifications added yet.</p>}
-                </div>
               </div>
-
-              {/* Consultation Preferences */}
-              <div className="glass-card" style={{ padding: 28 }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}><Globe size={18} /> Consultation Preferences</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-                  <div>
-                    <label style={labelStyle}>Consultation Type</label>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {CONSULT_TYPES.map(ct => (
-                        <button key={ct} type="button" onClick={() => setForm(f => ({ ...f, consultationType: ct }))} style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${form.consultationType === ct ? 'var(--accent)' : 'var(--border)'}`, background: form.consultationType === ct ? 'rgba(14,165,233,0.12)' : 'transparent', color: form.consultationType === ct ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', fontWeight: 500, fontSize: 13, transition: 'all 0.2s' }}>
-                          {ct}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Languages Spoken</label>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {COMMON_LANGS.map(lang => (
-                        <button key={lang} type="button" onClick={() => toggleLanguage(lang)} style={{ padding: '7px 12px', borderRadius: 8, border: `1px solid ${form.languages.includes(lang) ? 'var(--accent)' : 'var(--border)'}`, background: form.languages.includes(lang) ? 'rgba(14,165,233,0.12)' : 'transparent', color: form.languages.includes(lang) ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 12, fontWeight: 500, transition: 'all 0.2s' }}>
-                          {lang}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Save */}
-              <button type="submit" className="btn-primary pulse-glow" disabled={saving} style={{ alignSelf: 'flex-end', padding: '13px 32px', fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Save size={16} /> {saving ? 'Saving...' : 'Save Profile'}
-              </button>
-            </form>
-          )}
-        </div>
+            </div>
+          </form>
+        )}
       </main>
     </div>
   );

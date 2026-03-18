@@ -1,8 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Stethoscope, Video, Shield, ArrowRight, Star, Users, Clock, Quote, Sparkles } from 'lucide-react';
+import { Stethoscope, Video, Shield, ArrowRight, Star, Users, Clock, Quote, Sparkles, ShieldCheck } from 'lucide-react';
 
 // React Bits Components
 import DarkVeil from '@/components/react-bits/DarkVeil';
@@ -20,11 +21,16 @@ import GlassSurface from '@/components/react-bits/GlassSurface';
 
 export default function HomePage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [doctorCount, setDoctorCount] = useState(null);
   const [onlineCount, setOnlineCount] = useState(null);
   const [titleComplete, setTitleComplete] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
+    // We allow users to see the landing page even if logged in.
+    // Redirection only happens if they try to access /login or /register while logged in (handled by middleware).
+    
     fetch('/api/public/stats')
       .then(res => res.json())
       .then(data => {
@@ -32,7 +38,7 @@ export default function HomePage() {
         setOnlineCount(data.onlineCount);
       })
       .catch(err => console.error('Error fetching stats:', err));
-  }, []);
+  }, [user, router]);
 
 
   const stats = [
@@ -124,8 +130,8 @@ export default function HomePage() {
       `}</style>
       
       {/* Hero Content */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '140px 0 100px' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px' }}>
+      <section style={{ position: 'relative', zIndex: 1, padding: '100px 0 60px' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.8fr)', gap: 60, alignItems: 'center' }} className="hero-grid">
             <div style={{ textAlign: 'left' }} className="hero-text-content">
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(14,165,233,0.1)', border: '1px solid rgba(14,165,233,0.3)', borderRadius: 20, padding: '6px 16px', marginBottom: 24, backdropFilter: 'blur(4px)' }}>
@@ -135,7 +141,7 @@ export default function HomePage() {
                 </span>
               </div>
               
-              <h1 style={{ fontSize: 'clamp(40px, 5vw, 64px)', fontWeight: 900, lineHeight: 1.1, marginBottom: 24, color: 'white', display: 'flex', flexWrap: 'wrap', gap: '0 12px' }}>
+              <h1 style={{ fontSize: 'clamp(32px, 8vw, 64px)', fontWeight: 900, lineHeight: 1.1, marginBottom: 20, color: 'white', display: 'flex', flexWrap: 'wrap', gap: '0 8px' }}>
                 <BlurText text="Your Health," delay={150} animateBy="words" direction="top" stepDuration={0.6} />
                 <BlurText 
                   text="One Click Away" 
@@ -151,19 +157,19 @@ export default function HomePage() {
               
               <SplitText
                 text="Book appointments with top doctors and consult via secure video calls — anytime, anywhere. Experience the future of healthcare."
-                className="text-lg"
+                className="text-base md:text-lg"
                 delay={30}
                 duration={0.8}
                 animate={titleComplete}
                 textAlign="left"
-                style={{ fontSize: 20, color: '#94a3b8', maxWidth: 540, marginBottom: 40, lineHeight: 1.6 }}
+                style={{ fontSize: 'clamp(16px, 2vw, 20px)', color: '#94a3b8', maxWidth: 540, marginBottom: 32, lineHeight: 1.6 }}
               />
               
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                <Link href="/doctors" style={{ 
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'inherit' }}>
+                <Link href="/dashboard/patient/doctors" style={{ 
                   textDecoration: 'none', 
-                  fontSize: 17, 
-                  padding: '16px 36px',
+                  fontSize: 16, 
+                  padding: '14px 28px',
                   borderRadius: '999px',
                   border: '1px solid rgba(14, 165, 233, 0.5)',
                   background: 'rgba(14, 165, 233, 0.1)',
@@ -179,8 +185,8 @@ export default function HomePage() {
                 </Link>
                 <Link href="/register?role=doctor" style={{ 
                   textDecoration: 'none', 
-                  fontSize: 17, 
-                  padding: '16px 36px',
+                  fontSize: 16, 
+                  padding: '14px 28px',
                   borderRadius: '999px',
                   background: 'rgba(148, 163, 184, 0.08)',
                   color: '#94a3b8',
@@ -268,7 +274,7 @@ export default function HomePage() {
 
 
       {/* Stats Row */}
-      <section style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px 80px' }}>
+      <section style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px 60px' }}>
         <div style={{ display: 'flex', gap: 32, justifyContent: 'center', paddingTop: 60, flexWrap: 'wrap' }}>
           {stats.map((s, i) => (
             <div key={i} style={{ textAlign: 'center' }}>
@@ -321,8 +327,8 @@ export default function HomePage() {
       </section>
 
       {/* Patient Testimonials */}
-      <section style={{ padding: '120px 0' }}>
-        <div style={{ textAlign: 'center', marginBottom: 60, padding: '0 32px' }}>
+      <section style={{ padding: '80px 0' }}>
+        <div style={{ textAlign: 'center', marginBottom: 40, padding: '0 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
             <GradientText
               colors={["#22d3ee", "#818cf8", "#c084fc", "#22d3ee"]}
@@ -360,12 +366,12 @@ export default function HomePage() {
       </section>
 
       {/* Specialties */}
-      <section style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px 80px', textAlign: 'center' }}>
-        <h2 style={{ fontSize: 36, fontWeight: 800, marginBottom: 12 }}>Browse by Specialty</h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: 32 }}>Find the right specialist for your needs</p>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
+      <section style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px 60px', textAlign: 'center' }}>
+        <h2 style={{ fontSize: 'clamp(28px, 4vw, 36px)', fontWeight: 800, marginBottom: 12 }}>Browse by Specialty</h2>
+        <p style={{ color: 'var(--text-muted)', marginBottom: 24 }}>Find the right specialist for your needs</p>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
           {specialties.map((s) => (
-            <Link key={s} href={`/doctors?specialization=${s}`} style={{
+            <Link key={s} href={`/dashboard/patient/doctors?specialization=${s}`} style={{
               textDecoration: 'none',
               background: 'rgba(14,165,233,0.08)',
               border: '1px solid rgba(14,165,233,0.2)',
@@ -380,6 +386,80 @@ export default function HomePage() {
               onMouseLeave={e => { e.target.style.background = 'rgba(14,165,233,0.08)'; }}
             >{s}</Link>
           ))}
+        </div>
+      </section>
+
+      {/* About Us Section */}
+      <section id="about-section" style={{ padding: '100px 0 60px' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px' }}>
+          <div className="w-full relative overflow-hidden">
+            <div className="p-8 md:p-12 lg:p-16 grid grid-cols-1 md:grid-cols-[1.2fr_0.8fr] gap-12 md:gap-20 items-center">
+              <div className="text-left">
+                <GradientText
+                  colors={["#22d3ee", "#818cf8", "#c084fc", "#22d3ee"]}
+                  animationSpeed={6}
+                  showBorder={false}
+                  className="text-sm font-bold tracking-widest mb-4"
+                >
+                  Our Mission
+                </GradientText>
+                
+                <h2 style={{ fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 900, color: 'white', lineHeight: 1.1, marginBottom: 24 }}>
+                  Revolutionizing Healthcare <br/>
+                  <span style={{ color: '#94a3b8', fontWeight: 700 }}>With Human-Centric AI.</span>
+                </h2>
+                
+                <p style={{ color: '#94a3b8', fontSize: 'clamp(16px, 1.2vw, 19px)', lineHeight: 1.6, marginBottom: 32, maxWidth: 600 }}>
+                  Sanjeevni was born from a simple idea: that quality healthcare should be accessible to everyone, regardless of where they live. We combine cutting-edge technology with the expertise of top medical professionals to provide a seamless, secure, and compassionate care experience.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="flex items-start gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all hover:translate-y-[-2px] duration-300">
+                    <div className="p-3 bg-blue-500/10 rounded-xl">
+                      <ShieldCheck size={24} className="text-blue-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white mb-1">Secure & Private</h4>
+                      <p className="text-sm text-zinc-400">HIPAA-compliant video calls and encrypted data.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all hover:translate-y-[-2px] duration-300">
+                    <div className="p-3 bg-purple-500/10 rounded-xl">
+                      <Users size={24} className="text-purple-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white mb-1">Human-First</h4>
+                      <p className="text-sm text-zinc-400">Technology that empowers, not replaces, doctors.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="relative">
+                <div className="w-full aspect-square max-w-[500px] lg:max-w-[540px] mx-auto relative group">
+                   {/* Background Glow */}
+                   <div className="absolute inset-0 bg-blue-500/25 blur-[120px] rounded-full animate-pulse group-hover:bg-blue-500/35 transition-colors duration-500" />
+                   
+                   <GlassSurface 
+                     borderRadius={999} 
+                     backgroundOpacity={0.12} 
+                     className="w-full h-full border border-white/10 flex items-center justify-center p-10 md:p-16 transition-transform duration-500 group-hover:scale-[1.03]"
+                   >
+                     <div className="text-center">
+                        <div className="relative mb-8">
+                          <Stethoscope size={96} className="text-blue-400 mx-auto drop-shadow-[0_0_20px_rgba(59,130,246,0.6)] animate-bounce-slow" />
+                          <div className="absolute -top-3 -right-3 p-3 bg-blue-500/25 rounded-full backdrop-blur-md border border-white/10">
+                            <Sparkles size={20} className="text-blue-300" />
+                          </div>
+                        </div>
+                        <div className="text-5xl md:text-6xl font-black text-white mb-3 tracking-tighter">10k+</div>
+                        <div className="text-zinc-400/60 font-bold tracking-widest text-sm md:text-base">Global Patients</div>
+                     </div>
+                   </GlassSurface>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

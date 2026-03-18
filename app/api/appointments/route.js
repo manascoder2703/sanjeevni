@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { sendRealtimeNotification } from '@/lib/notifications';
 import connectDB from '@/lib/mongodb';
 import Appointment from '@/models/Appointment';
 import Doctor from '@/models/Doctor';
@@ -60,7 +61,6 @@ export async function POST(request) {
     }
 
     // Combine date and timeSlot into a single Date object
-    // Handles "10:00 AM" or "14:30" (24h)
     let hours, minutes;
     if (timeSlot.includes(' ')) {
       const [time, modifier] = timeSlot.split(' ');
@@ -100,6 +100,21 @@ export async function POST(request) {
       });
     } catch (emailErr) {
       console.warn('Email sending failed (non-critical):', emailErr.message);
+    }
+
+    // Send real-time notification to doctor
+    try {
+      const doctor = await Doctor.findById(doctorId);
+      if (doctor) {
+        await sendRealtimeNotification(doctor.userId, {
+          title: 'New Appointment',
+          content: `A new appointment has been booked for ${date} at ${timeSlot}.`,
+          type: 'booking',
+          link: '/dashboard/doctor'
+        });
+      }
+    } catch (notifyErr) {
+      console.warn('Real-time notification failed:', notifyErr.message);
     }
 
     return NextResponse.json({ message: 'Appointment booked!', appointment }, { status: 201 });
