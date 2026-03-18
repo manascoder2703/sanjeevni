@@ -70,13 +70,13 @@ export default function DashboardLayout({ children }) {
       <SidebarProvider>
         <CommandPalette />
         <AppSidebar />
-        <SidebarInset className="bg-[#050608] text-white relative overflow-hidden flex flex-col min-h-screen">
+        <SidebarInset className="bg-[#000000] text-white relative overflow-hidden flex flex-col min-h-screen">
           {/* Unified Background Decor (Shared across all pages) */}
           <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-0"
             style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
           <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-blue-500/5 blur-[120px] pointer-events-none z-0"></div>
 
-          <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-6 md:px-8 sticky top-0 bg-[#050608]/80 backdrop-blur-md z-50">
+          <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-6 md:px-8 sticky top-0 bg-[#000000]/80 backdrop-blur-md z-50">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="-ml-2 opacity-100 transition-opacity text-white" />
               <Separator
