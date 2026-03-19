@@ -191,6 +191,11 @@ io.on('connection', (socket) => {
 const bodyParser = require('body-parser');
 app.use(bodyParser.json());
 
+// Health Check for Render
+app.get('/healthz', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Internal notification endpoint
 app.post('/internal/notify', (req, res) => {
   const { userId, notification } = req.body;
