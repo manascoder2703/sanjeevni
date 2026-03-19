@@ -4,8 +4,9 @@ import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import {
   CalendarDays, Video, Clock, CheckCircle2, XCircle,
-  Activity, Users, Zap, Calendar, AlertCircle
+  Activity, Users, Zap, Calendar, AlertCircle, Star, Loader2
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 function getInitials(name = '') {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -27,6 +28,9 @@ function getStatusConfig(status) {
 }
 
 function getJoinState(appointment) {
+  if (appointment.status !== 'confirmed') {
+    return { show: false, countdown: null };
+  }
   let scheduled;
   if (appointment.scheduledDateTime) {
     scheduled = new Date(appointment.scheduledDateTime);
@@ -62,10 +66,14 @@ export default function PatientDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('active');
+  const [reviewApt, setReviewApt] = useState(null);
+  const [reviewForm, setReviewForm] = useState({ doctorRating: 0, platformRating: 0, comment: '' });
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewedIds, setReviewedIds] = useState(new Set());
 
   const fetchAppointments = useCallback(async () => {
     try {
-      const res = await fetch('/api/appointments');
+      const res = await fetch('/api/appointments?t=' + Date.now(), { cache: 'no-store', credentials: 'include' });
       const data = await res.json();
       setAppointments(data.appointments || []);
     } catch (e) {
@@ -74,6 +82,34 @@ export default function PatientDashboard() {
       setLoading(false);
     }
   }, []);
+
+  const submitReview = async () => {
+    if (reviewForm.doctorRating === 0 || reviewForm.platformRating === 0) {
+      toast.error('Please provide both ratings');
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      const res = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          appointmentId: reviewApt._id,
+          ...reviewForm
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to submit review');
+      toast.success('Thank you for your feedback!');
+      setReviewedIds(prev => new Set([...prev, String(reviewApt._id)]));      setReviewApt(null);
+      setReviewForm({ doctorRating: 0, platformRating: 0, comment: '' });
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
@@ -188,7 +224,7 @@ export default function PatientDashboard() {
                       <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', color }}>{label}</span>
                     </div>
                     {joinState.show ? (
-                      <Link href={`/dashboard/patient/consultation/${appt.roomId}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px', background: '#3b82f6', color: '#fff', fontSize: '12px', fontWeight: '700', textDecoration: 'none', flexShrink: 0 }}>
+                      <Link href={`/video/${appt.roomId}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px', background: '#3b82f6', color: '#fff', fontSize: '12px', fontWeight: '700', textDecoration: 'none', flexShrink: 0 }}>
                         <Video size={12} /> Join
                       </Link>
                     ) : joinState.countdown ? (
@@ -345,6 +381,7 @@ export default function PatientDashboard() {
               const spec    = appt.doctorId?.specialization || 'Specialist';
               const { label, color, bg, border, dot } = getStatusConfig(appt.status);
               const joinState = getJoinState(appt);
+              const isReviewed = appt.isReviewed || reviewedIds.has(String(appt._id));
               return (
                 <div key={appt._id}
                   style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1.4fr 1fr 1.4fr 1.2fr', gap: '16px', padding: '20px 32px', alignItems: 'center', borderBottom: i !== tabData[activeTab].length - 1 ? '0.5px solid rgba(255,255,255,0.04)' : 'none', transition: 'background 0.15s' }}
@@ -371,13 +408,24 @@ export default function PatientDashboard() {
                     <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', color }}>{label}</span>
                   </div>
 
-                  {/* Action */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                     {joinState.show ? (
-                      <Link href={`/dashboard/patient/consultation/${appt.roomId}`}
+                      <Link href={`/video/${appt.roomId}`}
                         style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', background: '#3b82f6', color: '#fff', fontSize: '12px', fontWeight: '600', textDecoration: 'none' }}>
                         <Video size={11} /> Join
                       </Link>
+                    ) : isReviewed ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#4ade80', fontSize: '11px', fontWeight: '700' }}>
+                         <CheckCircle2 size={12} /> Reviewed
+                      </div>
+                    ) : appt.status === 'completed' ? (
+                      <button onClick={() => setReviewApt(appt)}
+                        style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '11px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                      >
+                         Rate & Review
+                      </button>
                     ) : joinState.countdown ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                         <Clock size={11} style={{ color: 'rgba(255,255,255,0.3)' }} />
@@ -393,6 +441,90 @@ export default function PatientDashboard() {
           )}
         </div>
       </div>
+
+      {/* Review Modal */}
+      {reviewApt && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}>
+           <div style={{ width: '100%', maxWidth: '540px', background: '#0a0b0d', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '32px', padding: '40px', display: 'flex', flexDirection: 'column', gap: '32px', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '2px', background: 'linear-gradient(90deg, #3b82f6, #60a5fa, #3b82f6)' }}></div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '12px' }}>
+                 <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: 'rgba(255, 215, 0, 0.1)', border: '1px solid rgba(255, 215, 0, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFD700', marginBottom: '8px' }}>
+                    <Star size={32} style={{ fill: '#FFEB3B' }} />
+                 </div>
+                 <h2 style={{ fontSize: '24px', fontWeight: '900', color: '#fff', margin: 0, textTransform: 'uppercase', letterSpacing: '-0.5px' }}>Rate your Experience</h2>
+                 <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.4)', fontWeight: '500', margin: 0 }}>Consultation with Dr. {reviewApt.doctorId?.userId?.name || 'Doctor'}</p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                 {/* Ratings */}
+                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <RatingField 
+                      label="Doctor Quality" 
+                      value={reviewForm.doctorRating} 
+                      onChange={v => setReviewForm(f => ({ ...f, doctorRating: v }))} 
+                      icon={Activity}
+                    />
+                    <RatingField 
+                      label="Platform Exp." 
+                      value={reviewForm.platformRating} 
+                      onChange={v => setReviewForm(f => ({ ...f, platformRating: v }))} 
+                      icon={Zap}
+                    />
+                 </div>
+
+                 {/* Comment */}
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <label style={{ fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.2)', paddingLeft: '4px' }}>Descriptive Thoughts</label>
+                    <textarea 
+                      placeholder="Share your thoughts about the consultation..." 
+                      style={{ width: '100%', minHeight: '120px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '16px', color: '#fff', fontSize: '14px', outline: 'none', resize: 'none', transition: 'border-color 0.2s' }}
+                      onFocus={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'}
+                      onBlur={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
+                      value={reviewForm.comment}
+                      onChange={e => setReviewForm(f => ({ ...f, comment: e.target.value }))}
+                    />
+                 </div>
+
+                 <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                    <button onClick={() => setReviewApt(null)}
+                      style={{ flex: 1, padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', fontSize: '14px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#000'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}
+                    >
+                       Cancel
+                    </button>
+                    <button onClick={submitReview} disabled={submittingReview}
+                      style={{ flex: 2, padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: '14px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#000'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#fff'; }}
+                    >
+                       {submittingReview ? <Loader2 className="animate-spin" size={18} /> : 'Submit Feedback'}
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RatingField({ label, value, onChange, icon: Icon }) {
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Icon size={12} style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <span style={{ fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.2)' }}>{label}</span>
+       </div>
+       <div style={{ display: 'flex', gap: '6px' }}>
+          {[1,2,3,4,5].map(star => (
+            <button key={star} onClick={() => onChange(star === 1 && value === 1 ? 0 : star)}
+              style={{ width: '32px', height: '32px', borderRadius: '8px', background: star <= value ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${star <= value ? 'rgba(255, 215, 0, 0.3)' : 'rgba(255,255,255,0.05)'}`, color: star <= value ? '#FFD700' : 'rgba(255,255,255,0.15)', cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+               <Star size={14} style={{ fill: star <= value ? '#FFEB3B' : 'none' }} />
+            </button>
+          ))}
+       </div>
     </div>
   );
 }

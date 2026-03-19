@@ -43,7 +43,8 @@ export function SignupForm({
     confirmPassword: '',
     specialization: '', 
     fee: 500, 
-    experience: 1
+    experience: 1,
+    gender: ''
   });
 
   const specializations = [
@@ -153,7 +154,49 @@ export function SignupForm({
                     </Select>
                   </Field>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <Field>
+                  <FieldLabel className="text-white text-[14px] font-bold mb-2">Gender</FieldLabel>
+                  <Select onValueChange={(val) => setForm(prev => ({ ...prev, gender: val }))}>
+                    <SelectTrigger className="bg-white/[0.03] border-white/5 text-white h-12 px-4 rounded-xl">
+                      <SelectValue placeholder="Select Gender" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-black/40 backdrop-blur-xl border-white/10 text-white">
+                      <SelectItem value="male" className="focus:bg-white focus:text-black transition-colors cursor-pointer rounded-lg mx-1 my-0.5">Male</SelectItem>
+                      <SelectItem value="female" className="focus:bg-white focus:text-black transition-colors cursor-pointer rounded-lg mx-1 my-0.5">Female</SelectItem>
+                      <SelectItem value="other" className="focus:bg-white focus:text-black transition-colors cursor-pointer rounded-lg mx-1 my-0.5">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <Field>
+                  <FieldLabel className="text-white text-[14px] font-bold mb-2">Gender</FieldLabel>
+                  <Select onValueChange={(val) => setForm(prev => ({ ...prev, gender: val }))}>
+                    <SelectTrigger className="bg-white/[0.03] border-white/5 text-white h-12 px-4 rounded-xl">
+                      <SelectValue placeholder="Select Gender" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-black/40 backdrop-blur-xl border-white/10 text-white">
+                      <SelectItem value="male" className="focus:bg-white focus:text-black transition-colors cursor-pointer rounded-lg mx-1 my-0.5">Male</SelectItem>
+                      <SelectItem value="female" className="focus:bg-white focus:text-black transition-colors cursor-pointer rounded-lg mx-1 my-0.5">Female</SelectItem>
+                      <SelectItem value="other" className="focus:bg-white focus:text-black transition-colors cursor-pointer rounded-lg mx-1 my-0.5">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <Field>
+                  <FieldLabel className="text-white text-[14px] font-bold mb-2">Gender</FieldLabel>
+                  <Select onValueChange={(val) => setForm(prev => ({ ...prev, gender: val }))}>
+                    <SelectTrigger className="bg-white/[0.03] border-white/5 text-white h-12 px-4 rounded-xl">
+                      <SelectValue placeholder="Select Gender" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-black/40 backdrop-blur-xl border-white/10 text-white">
+                      <SelectItem value="male" className="focus:bg-white focus:text-black transition-colors cursor-pointer rounded-lg mx-1 my-0.5">Male</SelectItem>
+                      <SelectItem value="female" className="focus:bg-white focus:text-black transition-colors cursor-pointer rounded-lg mx-1 my-0.5">Female</SelectItem>
+                      <SelectItem value="other" className="focus:bg-white focus:text-black transition-colors cursor-pointer rounded-lg mx-1 my-0.5">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <div className="grid grid-cols-2 gap-4">
                     <Field>
                       <FieldLabel htmlFor="fee" className="text-white text-[14px] font-bold mb-2">Fee (₹)</FieldLabel>
                       <div className="relative group">

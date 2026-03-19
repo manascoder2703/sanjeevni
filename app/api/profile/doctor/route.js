@@ -36,7 +36,7 @@ export async function PUT(request) {
     }
 
     // Update User fields
-    const userFields = ['name', 'phone', 'avatar'];
+    const userFields = ['name', 'phone', 'avatar', 'gender'];
     const userUpdates = {};
     for (const f of userFields) {
       if (body[f] !== undefined) userUpdates[f] = body[f];

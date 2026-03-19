@@ -1,166 +1,205 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  Calendar, 
-  Video, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Stethoscope, 
-  Users, 
-  Sparkles, 
-  X, 
-  Loader2,
-  TrendingUp,
-  Activity
+import {
+  Calendar, Video, CheckCircle, XCircle, Clock,
+  Users, Sparkles, X, Loader2, Activity, Stethoscope,
+  Star, AlertCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import io from 'socket.io-client';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import HoloCard from '@/components/HoloCard';
-import ShinyText from '@/components/react-bits/ShinyText';
-
 import { getCallWindowStatus, secondsUntilWindow } from '@/lib/callWindow';
 
-const volumeData = [
-  { name: 'Mon', count: 4 },
-  { name: 'Tue', count: 7 },
-  { name: 'Wed', count: 5 },
-  { name: 'Thu', count: 8 },
-  { name: 'Fri', count: 12 },
-  { name: 'Sat', count: 3 },
-  { name: 'Sun', count: 2 },
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function getInitials(name = '') {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+const AVATAR_COLORS = [
+  { bg: 'rgba(59,130,246,0.2)',  text: '#60a5fa' },
+  { bg: 'rgba(139,92,246,0.2)', text: '#a78bfa' },
+  { bg: 'rgba(34,197,94,0.2)',  text: '#4ade80' },
+  { bg: 'rgba(249,115,22,0.2)', text: '#fb923c' },
+  { bg: 'rgba(236,72,153,0.2)', text: '#f472b6' },
+  { bg: 'rgba(20,184,166,0.2)', text: '#2dd4bf' },
 ];
 
-function AppointmentRow({ apt, updateStatus, showSummary }) {
+function getAvatarColor(name = '') {
+  return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+}
+
+function getStatusStyle(status) {
+  switch (status) {
+    case 'confirmed': return { label: 'Confirmed', color: '#60a5fa', bg: 'rgba(59,130,246,0.1)',  border: 'rgba(59,130,246,0.2)',  dot: '#60a5fa' };
+    case 'pending':   return { label: 'Pending',   color: '#fbbf24', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', dot: '#fbbf24' };
+    case 'completed': return { label: 'Completed', color: '#4ade80', bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  dot: '#4ade80' };
+    case 'cancelled': return { label: 'Cancelled', color: '#fb7185', bg: 'rgba(244,63,94,0.1)',  border: 'rgba(244,63,94,0.2)',  dot: '#fb7185' };
+    default:          return { label: status,      color: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)', dot: 'rgba(255,255,255,0.4)' };
+  }
+}
+
+function formatCountdown(totalSeconds) {
+  if (totalSeconds <= 0) return '0m 0s';
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m ${s}s`;
+}
+
+// ─── Appointment Row (Today's Schedule) ─────────────────────────────────────
+
+function TodayRow({ apt, onAccept, onReject, onDone, onSummary }) {
   const [windowStatus, setWindowStatus] = useState(getCallWindowStatus(apt));
-  const [secondsLeft, setSecondsLeft] = useState(secondsUntilWindow(apt));
+  const [secondsLeft, setSecondsLeft]   = useState(secondsUntilWindow(apt));
 
   useEffect(() => {
     if (apt.status !== 'confirmed') return;
-    const timer = setInterval(() => {
+    const t = setInterval(() => {
       setWindowStatus(getCallWindowStatus(apt));
       setSecondsLeft(secondsUntilWindow(apt));
     }, 1000);
-    return () => clearInterval(timer);
+    return () => clearInterval(t);
   }, [apt]);
 
   const patName = apt.patientId?.name || 'Patient';
-  
-  const statusConfig = {
-    pending: { label: 'Verification', color: 'text-amber-400 bg-amber-400/10 border-amber-400/20' },
-    confirmed: { label: 'Scheduled', color: 'text-blue-400 bg-blue-400/10 border-blue-400/20' },
-    completed: { label: 'Finished', color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
-    cancelled: { label: 'Aborted', color: 'text-red-400 bg-red-400/10 border-red-400/20' }
-  }[apt.status] || { label: apt.status, color: 'text-white/40 bg-white/5 border-white/10' };
-
-  const formatCountdown = (totalSeconds) => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${mins}m ${secs}s`;
-  };
+  const { bg, text } = getAvatarColor(patName);
+  const { label, color, bg: sBg, border: sBorder, dot } = getStatusStyle(apt.status);
 
   return (
-    <HoloCard 
-      className="p-6 border border-white/5 bg-white/[0.01] rounded-2xl shadow-xl"
-      spotlightColor="rgba(59, 130, 246, 0.05)"
+    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 20px', background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: '14px', transition: 'background 0.15s' }}
+      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
+      onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
     >
-      <div className="flex flex-col lg:flex-row items-center justify-between gap-6 relative z-10">
-        <div className="flex items-center gap-5 w-full lg:w-auto">
-          <div className="size-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center font-black text-white text-xl shadow-lg shadow-cyan-500/20">
-            {patName[0]?.toUpperCase()}
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <p className="text-white font-black text-lg tracking-tight group-hover:text-cyan-400 transition-colors uppercase">{patName}</p>
-            <div className="flex items-center gap-2">
-              <span className="text-white/30 text-[10px] font-bold tracking-widest uppercase">{apt.timeSlot}</span>
-              <span className={`px-2 py-0.5 rounded-lg text-[8px] font-black tracking-widest uppercase border ${statusConfig.color}`}>
-                {statusConfig.label}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
-          {apt.status === 'pending' && (
-            <>
-              <button className="flex-1 lg:flex-none px-6 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-[10px] font-black tracking-widest uppercase transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2" onClick={() => updateStatus(apt._id, 'confirmed')}>
-                <CheckCircle size={14} /> Accept
-              </button>
-              <button className="flex-1 lg:flex-none px-4 py-2.5 bg-white/5 hover:bg-red-500/10 text-white/30 hover:text-red-400 rounded-xl border border-white/5 transition-all" onClick={() => updateStatus(apt._id, 'cancelled')}>
-                <XCircle size={14} />
-              </button>
-            </>
-          )}
-          {apt.status === 'confirmed' && apt.roomId && (
-            <>
-              {windowStatus === 'open' ? (
-                <Link href={`/video/${apt.roomId}`} className="flex-1 lg:flex-none px-8 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-[10px] font-black tracking-widest uppercase transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 animate-pulse">
-                  <Video size={14} /> Enter Room
-                </Link>
-              ) : windowStatus === 'early' ? (
-                <div className="flex flex-col items-end gap-1.5">
-                   <button disabled className="px-8 py-2.5 bg-white/5 text-white/20 rounded-xl text-[10px] font-black tracking-widest uppercase border border-white/5 cursor-not-allowed">
-                     <Video size={14} /> Enter Room
-                   </button>
-                   <span className="text-[9px] font-black text-amber-500/80 bg-amber-500/5 px-2 py-0.5 rounded-md border border-amber-500/10 tracking-widest uppercase">
-                     {formatCountdown(secondsLeft)}
-                   </span>
-                </div>
-              ) : (
-                <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Session Expired</span>
-              )}
-              <button className="px-6 py-2.5 bg-white/5 hover:bg-emerald-500/10 text-white/30 hover:text-emerald-400 rounded-xl text-[10px] font-black tracking-widest uppercase border border-white/5 transition-all" onClick={() => updateStatus(apt._id, 'completed')}>
-                Mark Done
-              </button>
-            </>
-          )}
-          {apt.notes && (
-            <button className="px-6 py-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 rounded-xl text-[10px] font-black tracking-widest uppercase border border-cyan-500/20 transition-all flex items-center gap-2" onClick={() => showSummary(apt)}>
-              <Sparkles size={14} /> AI Brief
-            </button>
-          )}
-        </div>
+      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: '12px', fontWeight: '700', color: text }}>{getInitials(patName)}</span>
       </div>
-    </HoloCard>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: '13px', fontWeight: '600', color: '#fff', margin: 0 }}>{patName}</p>
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>{apt.timeSlot} · {apt.patientId?.email || ''}</p>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '99px', background: sBg, border: `0.5px solid ${sBorder}`, flexShrink: 0 }}>
+        <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: dot }} />
+        <span style={{ fontSize: '10px', fontWeight: '600', color }}>{label}</span>
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        {apt.status === 'pending' && (
+          <>
+            <button onClick={() => onAccept(apt._id)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px', background: 'rgba(34,197,94,0.12)', border: '0.5px solid rgba(34,197,94,0.25)', color: '#4ade80', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+              <CheckCircle size={13} /> Accept
+            </button>
+            <button onClick={() => onReject(apt._id)}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px', background: 'rgba(244,63,94,0.08)', border: '0.5px solid rgba(244,63,94,0.15)', color: '#fb7185', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+              <XCircle size={13} />
+            </button>
+          </>
+        )}
+        {apt.status === 'confirmed' && apt.roomId && (
+          <>
+            {windowStatus === 'open' ? (
+              <Link href={`/video/${apt.roomId}`}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '10px', background: '#3b82f6', color: '#fff', fontSize: '12px', fontWeight: '600', textDecoration: 'none' }}>
+                <Video size={13} /> Join
+              </Link>
+            ) : windowStatus === 'early' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)' }}>
+                <Clock size={11} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                <span style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' }}>{formatCountdown(secondsLeft)}</span>
+              </div>
+            ) : (
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)' }}>Expired</span>
+            )}
+            <button onClick={() => onDone(apt._id)}
+              style={{ padding: '8px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+              Done
+            </button>
+          </>
+        )}
+        {apt.notes && (
+          <button onClick={() => onSummary(apt)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '10px', background: 'rgba(139,92,246,0.1)', border: '0.5px solid rgba(139,92,246,0.2)', color: '#a78bfa', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+            <Sparkles size={12} /> AI
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
+
+// ─── Main Dashboard ──────────────────────────────────────────────────────────
 
 export default function DoctorDashboard() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [appointments, setAppointments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [summaryApt, setSummaryApt] = useState(null);
-  const [summaryText, setSummaryText] = useState('');
+  const [loading, setLoading]           = useState(true);
+  const [activeTab, setActiveTab]       = useState('pending');
+  const [summaryApt, setSummaryApt]     = useState(null);
+  const [summaryText, setSummaryText]   = useState('');
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [doctorProfile, setDoctorProfile] = useState(null);
+  const [isOnline, setIsOnline]         = useState(false);
+
+  const fetchAppointments = useCallback(async () => {
+    try {
+      const r = await fetch('/api/appointments');
+      const d = await r.json();
+      setAppointments(d.appointments || []);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }, []);
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      const r = await fetch('/api/profile/doctor');
+      const d = await r.json();
+      setDoctorProfile(d.doctor || null);
+    } catch (e) { console.error(e); }
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) { router.push('/login'); return; }
     fetchAppointments();
+    fetchProfile();
 
     const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001');
     socket.on('connect', () => {
       socket.emit('doctor-online', { userId: user.id });
+      setIsOnline(true);
     });
-    return () => socket.disconnect();
-  }, [user, authLoading]);
+    socket.on('disconnect', () => setIsOnline(false));
 
-  const fetchAppointments = async () => {
-    const r = await fetch('/api/appointments');
-    const d = await r.json();
-    setAppointments(d.appointments || []);
-    setLoading(false);
-  };
+    // Refresh appointments when new booking comes in
+    socket.on('new-notification', () => fetchAppointments());
+
+    return () => socket.disconnect();
+  }, [user, authLoading, fetchAppointments, fetchProfile]);
 
   const updateStatus = async (id, status) => {
-    await fetch(`/api/appointments/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
-    toast.success(`Session status: ${status}`);
-    fetchAppointments();
+    try {
+      await fetch(`/api/appointments/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status }),
+      });
+      toast.success(status === 'confirmed' ? 'Appointment accepted' : status === 'cancelled' ? 'Appointment rejected' : 'Marked as done');
+      fetchAppointments();
+    } catch (e) {
+      toast.error('Failed to update status');
+    }
   };
 
   const generateSummary = async (apt) => {
@@ -171,153 +210,306 @@ export default function DoctorDashboard() {
       const res = await fetch('/api/ai/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ notes: apt.notes, patientName: apt.patientId?.name }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setSummaryText(data.summary);
     } catch (e) {
-      toast.error(e.message || 'Briefing failure');
+      toast.error(e.message || 'Failed to generate summary');
       setSummaryApt(null);
     } finally {
       setSummaryLoading(false);
     }
   };
 
-  const pendingCount = appointments.filter(a => a.status === 'pending').length;
-  const confirmedCount = appointments.filter(a => a.status === 'confirmed').length;
-  const completedCount = appointments.filter(a => a.status === 'completed').length;
+  // ── Derived data ──
+  const todayDate         = new Date().toISOString().split('T')[0];
+  const todayAppointments = appointments.filter(a => a.date === todayDate && a.status !== 'cancelled');
+  const pendingApts       = appointments.filter(a => a.status === 'pending');
+  const confirmedApts     = appointments.filter(a => a.status === 'confirmed');
+  const completedApts     = appointments.filter(a => a.status === 'completed');
+  const cancelledApts     = appointments.filter(a => a.status === 'cancelled');
+
+  const tabData = { pending: pendingApts, confirmed: confirmedApts, completed: completedApts, cancelled: cancelledApts };
+
+  const total             = appointments.length;
+  const acceptanceRate    = total > 0 ? Math.round(((total - cancelledApts.length) / total) * 100) : 0;
+  const completionRate    = total > 0 ? Math.round((completedApts.length / total) * 100) : 0;
+  const cancellationRate  = total > 0 ? Math.round((cancelledApts.length / total) * 100) : 0;
+
+  const firstName = user?.name?.split(' ')[0] || 'Doctor';
+  const hour      = new Date().getHours();
+  const greeting  = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  const tabList = [
+    { id: 'pending',   label: 'Pending',   count: pendingApts.length },
+    { id: 'confirmed', label: 'Confirmed', count: confirmedApts.length },
+    { id: 'completed', label: 'Completed', count: completedApts.length },
+    { id: 'cancelled', label: 'Cancelled', count: cancelledApts.length },
+  ];
+
+  const card = { background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.07)', borderRadius: '20px' };
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-[1600px] mx-auto">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', paddingBottom: '80px' }}>
+
       {/* Header */}
-
-      {/* Stats and Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 shrink-0">
-        <HoloCard 
-          className="lg:col-span-8 p-6 md:p-10 flex flex-col gap-8 border-none bg-white/[0.01] shadow-2xl"
-          spotlightColor="rgba(6, 182, 212, 0.1)"
-        >
-           <div className="flex items-center justify-between relative z-10">
-              <div className="flex flex-col gap-1">
-                <h3 className="text-2xl font-black text-white tracking-tight">Patient Flow Metrics</h3>
-                <p className="text-white/20 text-[10px] font-bold uppercase tracking-[0.2em]">Weekly Consultation Volume</p>
-              </div>
-              <div className="p-3 bg-cyan-500/10 rounded-2xl text-cyan-500 border border-cyan-500/20 shadow-lg shadow-cyan-500/10">
-                <TrendingUp size={24} />
-              </div>
-           </div>
-           
-           <div className="h-[280px] w-full relative z-10 mr-4">
-             <ResponsiveContainer width="100%" height="100%">
-               <AreaChart data={volumeData}>
-                 <defs>
-                   <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                     <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3}/>
-                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                   </linearGradient>
-                 </defs>
-                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff03" />
-                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#ffffff20', fontSize: 10, fontWeight: 900 }} />
-                 <Tooltip 
-                   contentStyle={{ 
-                     backgroundColor: 'rgba(0,0,0,0.9)', 
-                     backdropFilter: 'blur(20px)',
-                     borderRadius: '16px', 
-                     border: '1px solid #ffffff10', 
-                     color: '#fff',
-                     fontSize: '11px',
-                     fontWeight: '900'
-                   }} 
-                 />
-                 <Area type="monotone" dataKey="count" stroke="#06b6d4" strokeWidth={5} fillOpacity={1} fill="url(#colorCount)" />
-               </AreaChart>
-             </ResponsiveContainer>
-           </div>
-        </HoloCard>
-
-        <div className="lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-6">
-           <StatBox label="Queue" value={pendingCount} color="amber" icon={<Clock size={20}/>}/>
-           <StatBox label="Active" value={confirmedCount} color="blue" icon={<Activity size={20}/>}/>
-           <StatBox label="Success" value={completedCount} color="emerald" icon={<CheckCircle size={20}/>}/>
-           <StatBox label="Total" value={appointments.length} color="cyan" icon={<Users size={20}/>}/>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.2)', marginBottom: '4px' }}>{greeting}</div>
+          <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#fff', letterSpacing: '-0.5px', margin: 0 }}>
+            Dr. {firstName} <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span> <span style={{ color: '#3b82f6' }}>Doctor Portal</span>
+          </h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '99px', background: isOnline ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)', border: `0.5px solid ${isOnline ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
+          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isOnline ? '#4ade80' : 'rgba(255,255,255,0.2)' }} />
+          <span style={{ fontSize: '12px', fontWeight: '600', color: isOnline ? '#4ade80' : 'rgba(255,255,255,0.3)' }}>{isOnline ? 'Online' : 'Offline'}</span>
         </div>
       </div>
 
-      {/* Workspace */}
-      <HoloCard className="flex-1 flex flex-col overflow-hidden border border-white/5 bg-white/[0.01] rounded-2xl shadow-2xl">
-        <div className="flex items-center justify-between p-5 md:px-8 border-b border-white/10 bg-white/[0.02] shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-cyan-500/10 rounded-2xl text-cyan-400 border border-cyan-500/20 shadow-lg">
-              <Stethoscope size={24} />
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+        {[
+          { label: 'Pending',   value: pendingApts.length,   iconColor: '#fbbf24', iconBg: 'rgba(245,158,11,0.12)',  Icon: Clock },
+          { label: 'Confirmed', value: confirmedApts.length, iconColor: '#60a5fa', iconBg: 'rgba(59,130,246,0.12)',  Icon: Calendar },
+          { label: 'Completed', value: completedApts.length, iconColor: '#4ade80', iconBg: 'rgba(34,197,94,0.12)',   Icon: CheckCircle },
+          { label: 'Total',     value: total,                iconColor: '#a78bfa', iconBg: 'rgba(139,92,246,0.12)',  Icon: Users },
+        ].map(stat => (
+          <div key={stat.label} style={{ ...card, padding: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: stat.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <stat.Icon size={18} style={{ color: stat.iconColor }} />
             </div>
-            <div className="flex flex-col">
-              <h2 className="text-2xl font-black text-white tracking-tight">Daily Schedule</h2>
-              <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.2em]">Active Consultation Queue</p>
+            <div>
+              <div style={{ fontSize: '24px', fontWeight: '800', color: '#fff', lineHeight: 1 }}>{loading ? '—' : stat.value}</div>
+              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '3px' }}>{stat.label}</div>
             </div>
           </div>
-        </div>
-        
-        <div className="p-6 md:p-8 flex-1 overflow-y-auto custom-scrollbar">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-32 gap-6">
-              <div className="size-16 border-2 border-cyan-500/20 border-t-cyan-500 animate-spin rounded-full shadow-lg shadow-cyan-500/10" />
+        ))}
+      </div>
+
+      {/* Today + Performance */}
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
+
+        {/* Today's Schedule */}
+        <div style={{ ...card, padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Stethoscope size={15} style={{ color: '#60a5fa' }} />
+              </div>
+              <span style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>Today's Schedule</span>
             </div>
-          ) : appointments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-32 text-center opacity-20">
-              <Calendar size={80} className="mb-4 text-white" />
-              <p className="text-white text-xl font-black tracking-tight">Operations Clear</p>
+            <span style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.2)' }}>
+              {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+            </span>
+          </div>
+
+          {loading ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0' }}>
+              <div className="size-8 border-2 border-blue-500/20 border-t-blue-500 animate-spin rounded-full" />
+            </div>
+          ) : todayAppointments.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: '10px', textAlign: 'center' }}>
+              <Calendar size={28} style={{ color: 'rgba(255,255,255,0.1)' }} />
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.25)', margin: 0 }}>No appointments today</p>
             </div>
           ) : (
-            <div className="grid gap-6">
-              {appointments.map(apt => (
-                <AppointmentRow key={apt._id} apt={apt} updateStatus={updateStatus} showSummary={generateSummary} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {todayAppointments.map(apt => (
+                <TodayRow key={apt._id} apt={apt}
+                  onAccept={id => updateStatus(id, 'confirmed')}
+                  onReject={id => updateStatus(id, 'cancelled')}
+                  onDone={id => updateStatus(id, 'completed')}
+                  onSummary={generateSummary}
+                />
               ))}
             </div>
           )}
         </div>
-      </HoloCard>
 
-      {/* Modal */}
-      {summaryApt && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center z-[100] p-6 animate-in slide-in-from-bottom duration-500">
-          <div className="glass-card max-w-2xl w-full p-10 relative border border-cyan-500/20 overflow-hidden">
-            <div className="absolute top-0 right-0 p-20 bg-cyan-500/10 blur-[120px] rounded-full translate-x-1/2 -translate-y-1/2"></div>
-            
-            <button onClick={() => setSummaryApt(null)} className="absolute top-8 right-8 p-3 rounded-full hover:bg-white/5 text-white/30 hover:text-white transition-all">
-              <X size={24} />
-            </button>
-            
-            <div className="flex items-center gap-6 mb-10">
-              <div className="p-4 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-3xl shadow-2xl shadow-cyan-500/20 rotate-3">
-                <Sparkles size={32} className="text-white" />
+        {/* Performance */}
+        <div style={{ ...card, padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Activity size={15} style={{ color: '#fbbf24' }} />
+            </div>
+            <span style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>Performance</span>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {[
+              { label: 'Completion rate',   value: completionRate,   color: '#3b82f6' },
+              { label: 'Acceptance rate',   value: acceptanceRate,   color: '#4ade80' },
+              { label: 'Cancellation rate', value: cancellationRate, color: '#fb7185' },
+            ].map(item => (
+              <div key={item.label}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>{item.label}</span>
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: '#fff' }}>{item.value}%</span>
+                </div>
+                <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '99px' }}>
+                  <div style={{ width: `${item.value}%`, height: '100%', background: item.color, borderRadius: '99px', transition: 'width 0.8s ease' }} />
+                </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <h3 className="text-3xl font-black text-white tracking-tight">Intelligence Briefing</h3>
-                <p className="text-cyan-400/70 text-sm font-bold tracking-widest uppercase">Subject: {summaryApt.patientId?.name}</p>
+            ))}
+          </div>
+
+          <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.06)' }} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {[
+              { label: 'Avg rating',       value: doctorProfile?.rating > 0 ? Number(doctorProfile.rating).toFixed(1) : '—', isRating: true },
+              { label: 'Total reviews',    value: doctorProfile?.totalReviews || 0 },
+              { label: 'Consultation fee', value: doctorProfile?.fee ? `₹${doctorProfile.fee.toLocaleString()}` : '—' },
+              { label: 'Experience',       value: doctorProfile?.experience ? `${doctorProfile.experience} yrs` : '—' },
+            ].map(item => (
+              <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>{item.label}</span>
+                {item.isRating ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Star size={11} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#fff' }}>{item.value}</span>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: '#fff' }}>{item.value}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Appointment Queue */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.2)', whiteSpace: 'nowrap' }}>Appointment Queue</span>
+          <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.05)' }} />
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {tabList.map(tab => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '12px', fontSize: '13px', fontWeight: '600', border: `0.5px solid ${isActive ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)'}`, background: isActive ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)', color: isActive ? '#fff' : 'rgba(255,255,255,0.35)', cursor: 'pointer', transition: 'all 0.2s' }}
+                onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}}
+                onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; }}}
+              >
+                {tab.label}
+                <span style={{ padding: '2px 7px', borderRadius: '99px', fontSize: '11px', fontWeight: '700', background: isActive ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)', color: isActive ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Table */}
+        <div style={{ ...card, overflow: 'hidden' }}>
+          {/* Header */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.5fr', gap: '16px', padding: '12px 28px', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
+            {['Patient', 'Date', 'Time', 'Status', 'Action'].map((h, i) => (
+              <span key={h} style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.2)', textAlign: i === 4 ? 'right' : 'left' }}>{h}</span>
+            ))}
+          </div>
+
+          {loading ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+              <div className="size-8 border-2 border-blue-500/20 border-t-blue-500 animate-spin rounded-full" />
+            </div>
+          ) : tabData[activeTab].length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', gap: '10px' }}>
+              <AlertCircle size={28} style={{ color: 'rgba(255,255,255,0.1)' }} />
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.2)', margin: 0 }}>No {activeTab} appointments</p>
+            </div>
+          ) : (
+            tabData[activeTab].map((apt, i) => {
+              const patName = apt.patientId?.name || 'Patient';
+              const { bg, text } = getAvatarColor(patName);
+              const { label, color, bg: sBg, border: sBorder, dot } = getStatusStyle(apt.status);
+              const [wStatus, setWStatus] = useState ? getCallWindowStatus(apt) : 'not-confirmed';
+
+              return (
+                <div key={apt._id}
+                  style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.5fr', gap: '16px', padding: '18px 28px', alignItems: 'center', borderBottom: i !== tabData[activeTab].length - 1 ? '0.5px solid rgba(255,255,255,0.04)' : 'none', transition: 'background 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                    <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: text }}>{getInitials(patName)}</span>
+                    </div>
+                    <p style={{ fontSize: '13px', fontWeight: '600', color: '#fff', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{patName}</p>
+                  </div>
+
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{formatDate(apt.date)}</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{apt.timeSlot || '—'}</span>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '99px', background: sBg, border: `0.5px solid ${sBorder}`, width: 'fit-content' }}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: dot }} />
+                    <span style={{ fontSize: '10px', fontWeight: '600', color }}>{label}</span>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    {apt.status === 'pending' && (
+                      <>
+                        <button onClick={() => updateStatus(apt._id, 'confirmed')}
+                          style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 14px', borderRadius: '8px', background: 'rgba(34,197,94,0.12)', border: '0.5px solid rgba(34,197,94,0.25)', color: '#4ade80', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                          <CheckCircle size={12} /> Accept
+                        </button>
+                        <button onClick={() => updateStatus(apt._id, 'cancelled')}
+                          style={{ display: 'flex', alignItems: 'center', padding: '7px 10px', borderRadius: '8px', background: 'rgba(244,63,94,0.08)', border: '0.5px solid rgba(244,63,94,0.15)', color: '#fb7185', cursor: 'pointer' }}>
+                          <XCircle size={12} />
+                        </button>
+                      </>
+                    )}
+                    {apt.status === 'confirmed' && apt.roomId && (
+                      <QueueJoinButton apt={apt} onDone={() => updateStatus(apt._id, 'completed')} />
+                    )}
+                    {(apt.status === 'completed' || apt.status === 'cancelled') && (
+                      <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)' }}>—</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* AI Summary Modal */}
+      {summaryApt && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '24px' }}>
+          <div style={{ background: '#0a0b0d', border: '0.5px solid rgba(139,92,246,0.3)', borderRadius: '24px', padding: '36px', maxWidth: '580px', width: '100%', position: 'relative' }}>
+            <button onClick={() => setSummaryApt(null)}
+              style={{ position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+              <X size={18} />
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
+              <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(139,92,246,0.15)', border: '0.5px solid rgba(139,92,246,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Sparkles size={20} style={{ color: '#a78bfa' }} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#fff', margin: 0 }}>AI Brief</h3>
+                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>Patient: {summaryApt.patientId?.name}</p>
               </div>
             </div>
-
-            <div className="bg-slate-950/40 rounded-3xl p-8 border border-white/5 shadow-inner min-h-[250px] flex items-center justify-center">
+            <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '16px', padding: '24px', border: '0.5px solid rgba(255,255,255,0.06)', minHeight: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {summaryLoading ? (
-                <div className="flex flex-col items-center gap-6">
-                  <Loader2 size={48} className="animate-spin text-cyan-500" />
-                  <p className="text-white/20 text-xs font-black tracking-widest uppercase animate-pulse">Running Neural Analysis...</p>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                  <Loader2 size={32} className="animate-spin" style={{ color: '#a78bfa' }} />
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.12em', margin: 0 }}>Analysing...</p>
                 </div>
               ) : (
-                <div className="text-white/90 leading-relaxed text-lg font-medium relative">
-                   <span className="text-4xl absolute -top-4 -left-6 opacity-20 font-serif">"</span>
-                   {summaryText}
-                   <span className="text-4xl absolute -bottom-8 -right-4 opacity-20 font-serif">"</span>
-                </div>
+                <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.7, margin: 0 }}>{summaryText}</p>
               )}
             </div>
-            
-            <div className="mt-10 flex items-center gap-4 p-5 bg-red-500/5 rounded-2xl border border-red-500/10">
-              <Activity className="text-red-500 shrink-0" size={24} />
-              <p className="text-red-400/60 text-[11px] font-bold leading-tight uppercase tracking-wider">
-                This analysis is AI-synthesized for decision support. Cross-reference with primary clinical data for precision medicine.
-              </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '16px', padding: '12px 16px', background: 'rgba(244,63,94,0.05)', borderRadius: '12px', border: '0.5px solid rgba(244,63,94,0.1)' }}>
+              <AlertCircle size={14} style={{ color: '#fb7185', flexShrink: 0 }} />
+              <p style={{ fontSize: '11px', color: 'rgba(251,113,133,0.6)', margin: 0 }}>AI-generated. Cross-reference with clinical data.</p>
             </div>
           </div>
         </div>
@@ -326,32 +518,38 @@ export default function DoctorDashboard() {
   );
 }
 
-function StatBox({ label, value, color, icon }) {
-  const themes = {
-    amber: { glow: 'rgba(245, 158, 11, 0.1)', text: 'text-amber-500', border: 'border-amber-500/20' },
-    blue: { glow: 'rgba(59, 130, 246, 0.1)', text: 'text-blue-500', border: 'border-blue-500/20' },
-    emerald: { glow: 'rgba(16, 185, 129, 0.1)', text: 'text-emerald-500', border: 'border-emerald-500/20' },
-    cyan: { glow: 'rgba(6, 182, 212, 0.1)', text: 'text-cyan-400', border: 'border-cyan-500/20' }
-  }
-  
-  const current = themes[color] || themes.cyan;
+// Separate component for join button in queue table to handle countdown
+function QueueJoinButton({ apt, onDone }) {
+  const [windowStatus, setWindowStatus] = useState(getCallWindowStatus(apt));
+  const [secondsLeft, setSecondsLeft]   = useState(secondsUntilWindow(apt));
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setWindowStatus(getCallWindowStatus(apt));
+      setSecondsLeft(secondsUntilWindow(apt));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [apt]);
 
   return (
-    <HoloCard 
-      spotlightColor={current.glow}
-      className={`p-5 border border-white/5 bg-white/[0.01] rounded-2xl shadow-xl`}
-    >
-      <div className="flex items-center justify-between relative z-10 w-full">
-        <div className="flex flex-col">
-          <span className="text-white/30 text-[9px] font-black tracking-[0.2em] uppercase mb-1">{label}</span>
-          <h4 className="text-3xl font-black text-white tracking-tighter drop-shadow-lg">
-            <ShinyText text={String(value)} speed={3} className="text-white" />
-          </h4>
+    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      {windowStatus === 'open' ? (
+        <Link href={`/video/${apt.roomId}`}
+          style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 14px', borderRadius: '8px', background: '#3b82f6', color: '#fff', fontSize: '12px', fontWeight: '600', textDecoration: 'none' }}>
+          <Video size={12} /> Join
+        </Link>
+      ) : windowStatus === 'early' ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)' }}>
+          <Clock size={11} style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <span style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.4)' }}>{formatCountdown(secondsLeft)}</span>
         </div>
-        <div className={`p-3.5 rounded-xl bg-white/10 backdrop-blur-xl border ${current.border} ${current.text} shadow-inner transition-transform group-hover:scale-105`}>
-          {icon}
-        </div>
-      </div>
-    </HoloCard>
-  )
+      ) : (
+        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)' }}>Expired</span>
+      )}
+      <button onClick={onDone}
+        style={{ padding: '7px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+        Done
+      </button>
+    </div>
+  );
 }

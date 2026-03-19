@@ -144,12 +144,12 @@ io.on('connection', (socket) => {
   });
 
   socket.on('chat-message', (data) => {
-    const { roomId, ...msg } = data;
+    const { roomId, message } = data;
     const room = rooms.get(roomId);
-    if (room) {
-      room.chatHistory.push(msg);
+    if (room && message) {
+      room.chatHistory.push({ message });
     }
-    socket.to(roomId).emit('chat-message', msg);
+    socket.to(roomId).emit('chat-message', { message });
   });
 
   socket.on('disconnect', async () => {

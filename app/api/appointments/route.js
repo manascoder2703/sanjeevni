@@ -8,6 +8,7 @@ import Doctor from '@/models/Doctor';
 import User from '@/models/User';
 import { getUserFromRequest } from '@/lib/auth';
 import { sendBookingConfirmation } from '@/lib/email';
+import Review from '@/models/Review';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function GET(request) {
@@ -26,10 +27,19 @@ export async function GET(request) {
 
     let appointments;
     if (user.role === 'patient') {
-      appointments = await Appointment.find({ patientId: user.userId })
+      const dbAppointments = await Appointment.find({ patientId: user.userId })
         .populate({ path: 'doctorId', populate: { path: 'userId', select: 'name avatar' } })
         .sort({ date: -1 })
         .lean();
+      
+      // Explicitly check reviews for each appointment to ensure isReviewed is accurate
+      const userReviews = await Review.find({ patientId: user.userId }).select('appointmentId').lean();
+      const reviewedIds = new Set(userReviews.map(r => r.appointmentId.toString()));
+      
+      appointments = dbAppointments.map(appt => ({
+        ...appt,
+        isReviewed: appt.isReviewed || reviewedIds.has(appt._id.toString())
+      }));
     } else if (user.role === 'doctor') {
       const doctor = await Doctor.findOne({ userId: user.userId });
       appointments = await Appointment.find({ doctorId: doctor?._id })
