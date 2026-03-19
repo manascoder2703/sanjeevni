@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { Search, ArrowRight, Star, Clock, Stethoscope } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Search, ArrowRight, Star, Stethoscope, SlidersHorizontal, X } from 'lucide-react';
 import Link from 'next/link';
 
 const specialties = [
@@ -16,53 +16,74 @@ const specialties = [
 ];
 
 const AVATAR_COLORS = [
-  { bg: 'bg-blue-500/20', text: 'text-blue-400' },
-  { bg: 'bg-violet-500/20', text: 'text-violet-400' },
-  { bg: 'bg-emerald-500/20', text: 'text-emerald-400' },
-  { bg: 'bg-orange-500/20', text: 'text-orange-400' },
-  { bg: 'bg-pink-500/20', text: 'text-pink-400' },
-  { bg: 'bg-teal-500/20', text: 'text-teal-400' },
-  { bg: 'bg-rose-500/20', text: 'text-rose-400' },
-  { bg: 'bg-cyan-500/20', text: 'text-cyan-400' },
+  { bg: 'rgba(59,130,246,0.2)',  text: '#60a5fa' },
+  { bg: 'rgba(139,92,246,0.2)', text: '#a78bfa' },
+  { bg: 'rgba(34,197,94,0.2)',  text: '#4ade80' },
+  { bg: 'rgba(249,115,22,0.2)', text: '#fb923c' },
+  { bg: 'rgba(236,72,153,0.2)', text: '#f472b6' },
+  { bg: 'rgba(20,184,166,0.2)', text: '#2dd4bf' },
+  { bg: 'rgba(244,63,94,0.2)',  text: '#fb7185' },
+  { bg: 'rgba(6,182,212,0.2)',  text: '#22d3ee' },
 ];
 
+const relatedConditions = {
+  'Cardiologist':      ['Heart failure', 'Arrhythmia'],
+  'Dermatologist':     ['Acne', 'Psoriasis'],
+  'Neurologist':       ['Migraine', 'Epilepsy'],
+  'Pediatrician':      ['Child health', 'Vaccines'],
+  'Psychiatrist':      ['Anxiety', 'Depression'],
+  'Orthopedic':        ['Joint pain', 'Fractures'],
+  'General Physician': ['Fever', 'Diabetes'],
+  'Gynecologist':      ['Prenatal', 'PCOS'],
+};
+
 function getAvatarColor(name = '') {
-  const index = name.charCodeAt(0) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[index];
+  return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
 }
 
 function getInitials(name = '') {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
-// Deterministic mock rating/availability based on doctor id
-function getMockMeta(id = '') {
-  const code = id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const rating = (4.4 + (code % 6) * 0.1).toFixed(1);
-  const isAvailable = code % 3 !== 0;
-  const busyHours = (code % 3) + 1;
-  return { rating, isAvailable, busyHours };
+// Fuzzy name match — strips spaces and does case-insensitive match
+function fuzzyNameMatch(fullName = '', query = '') {
+  if (!query) return true;
+  const normalize = s => s.toLowerCase().replace(/\s+/g, '');
+  const normalizedName  = normalize(fullName);
+  const normalizedQuery = normalize(query);
+  // Also check each word individually
+  const words = fullName.toLowerCase().split(/\s+/);
+  return normalizedName.includes(normalizedQuery) ||
+    words.some(w => w.startsWith(normalizedQuery));
 }
 
 export default function FindDoctors() {
-  const [doctors, setDoctors] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [doctors, setDoctors]               = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [searchQuery, setSearchQuery]       = useState('');
   const [selectedSpecialty, setSelectedSpecialty] = useState('All Specialists');
+  const [maxFee, setMaxFee]                 = useState(5000);
+  const [onlineOnly, setOnlineOnly]         = useState(false);
+  const [showFilters, setShowFilters]       = useState(false);
+  const [feeRange, setFeeRange]             = useState(5000);
 
-  useEffect(() => {
-    fetchDoctors();
-  }, [selectedSpecialty]);
+  useEffect(() => { fetchDoctors(); }, [selectedSpecialty]);
 
   const fetchDoctors = async () => {
     setLoading(true);
     try {
       const url = selectedSpecialty === 'All Specialists'
         ? '/api/doctors'
-        : `/api/doctors?specialization=${selectedSpecialty}`;
-      const res = await fetch(url);
+        : `/api/doctors?specialization=${encodeURIComponent(selectedSpecialty)}`;
+      const res  = await fetch(url);
       const data = await res.json();
-      setDoctors(data.doctors || []);
+      const docs = data.doctors || [];
+      setDoctors(docs);
+      // Set fee range max based on actual data
+      const maxActualFee = Math.max(...docs.map(d => d.fee || 0), 1000);
+      const roundedMax = Math.ceil(maxActualFee / 500) * 500;
+      setMaxFee(roundedMax);
+      setFeeRange(roundedMax);
     } catch (error) {
       console.error('Failed to fetch doctors:', error);
     } finally {
@@ -70,117 +91,194 @@ export default function FindDoctors() {
     }
   };
 
-  const filteredDoctors = doctors.filter(doc =>
-    doc.userId?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    doc.specialization?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    doc.biography?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // All filtering happens on the frontend
+  const filteredDoctors = useMemo(() => {
+    return doctors.filter(doc => {
+      const name = doc.userId?.name || '';
+      const spec = doc.specialization || '';
+      const bio  = doc.bio || '';
 
-  const availableCount = doctors.filter(d => getMockMeta(d._id).isAvailable).length;
+      // 1. Name / specialty / bio search (fuzzy, space-insensitive)
+      const matchesSearch = !searchQuery ||
+        fuzzyNameMatch(name, searchQuery) ||
+        spec.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        bio.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // 2. Fee filter
+      const fee = doc.fee || 0;
+      const matchesFee = fee <= feeRange;
+
+      // 3. Online filter
+      const matchesOnline = !onlineOnly || doc.isOnline === true;
+
+      return matchesSearch && matchesFee && matchesOnline;
+    });
+  }, [doctors, searchQuery, feeRange, onlineOnly]);
+
+  const onlineCount = doctors.filter(d => d.isOnline).length;
+  const avgRating   = doctors.length > 0
+    ? (doctors.reduce((s, d) => s + (d.rating || 0), 0) / doctors.length).toFixed(1)
+    : '—';
+
+  const hasActiveFilters = onlineOnly || feeRange < maxFee;
 
   return (
-    <div className="flex flex-col gap-10 w-full pb-20">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%', paddingBottom: '80px' }}>
 
       {/* Header */}
-      <div className="flex flex-col items-center gap-3 text-center">
-        <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-[10px] font-semibold uppercase tracking-widest text-white/30">
-          <span className="size-1.5 rounded-full bg-blue-500 inline-block" />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 14px', borderRadius: '99px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgba(255,255,255,0.3)' }}>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
           Medical Directory
         </span>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
-          Network <span className="text-blue-500">Diagnostics</span>
+        <h1 style={{ fontSize: '40px', fontWeight: '800', color: '#fff', letterSpacing: '-1px', margin: 0 }}>
+          Network <span style={{ color: '#3b82f6' }}>Diagnostics</span>
         </h1>
-        <p className="text-white/30 text-[11px] uppercase tracking-widest font-medium">
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: '600', margin: 0 }}>
           Access verified medical expertise
         </p>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-2xl mx-auto w-full group">
-        <Search
-          size={15}
-          className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-blue-400 transition-colors"
-        />
-        <input
-          type="text"
-          placeholder="Search doctors, specialties, or conditions..."
-          className="w-full bg-white/[0.03] border border-white/8 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-white/20 outline-none focus:border-blue-500/40 focus:ring-2 focus:ring-blue-500/10 transition-all"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-        />
+      {/* Search + Filter button */}
+      <div style={{ display: 'flex', gap: '10px', maxWidth: '700px', margin: '0 auto', width: '100%' }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <Search size={15} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.2)', pointerEvents: 'none' }} />
+          <input
+            type="text"
+            placeholder="Search by name, specialty, or condition..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px 14px 42px', fontSize: '14px', color: '#fff', outline: 'none', boxSizing: 'border-box' }}
+            onFocus={e => e.target.style.borderColor = 'rgba(59,130,246,0.4)'}
+            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')}
+              style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', padding: '4px' }}>
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <button onClick={() => setShowFilters(v => !v)}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderRadius: '14px', border: `1px solid ${hasActiveFilters ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)'}`, background: hasActiveFilters ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.03)', color: hasActiveFilters ? '#60a5fa' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
+          <SlidersHorizontal size={14} />
+          Filters {hasActiveFilters && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />}
+        </button>
       </div>
 
-      {/* Stats Row */}
+      {/* Filter Panel */}
+      {showFilters && (
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '20px', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '700px', margin: '0 auto', width: '100%' }}>
+
+          {/* Fee Range */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Consultation Fee</span>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Up to ₹{feeRange.toLocaleString()}</span>
+            </div>
+            <input type="range" min={0} max={maxFee} step={100} value={feeRange}
+              onChange={e => setFeeRange(Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#3b82f6', cursor: 'pointer' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)' }}>₹0</span>
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)' }}>₹{maxFee.toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Online Only Toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: '600', color: '#fff', margin: 0 }}>Available now only</p>
+              <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: '3px 0 0' }}>Show only doctors currently online</p>
+            </div>
+            <button onClick={() => setOnlineOnly(v => !v)}
+              style={{ width: '44px', height: '24px', borderRadius: '99px', background: onlineOnly ? '#3b82f6' : 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: '3px', left: onlineOnly ? '22px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+            </button>
+          </div>
+
+          {/* Reset */}
+          {hasActiveFilters && (
+            <button onClick={() => { setFeeRange(maxFee); setOnlineOnly(false); }}
+              style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+              Reset filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Stats */}
       {!loading && (
-        <div className="grid grid-cols-3 gap-3 w-full">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', width: '100%' }}>
           {[
-            { label: 'Specialists', value: doctors.length },
-            { label: 'Available Now', value: availableCount },
-            { label: 'Avg Rating', value: '4.8' },
+            { label: 'Specialists',   value: doctors.length },
+            { label: 'Online Now',    value: onlineCount, highlight: onlineCount > 0 },
+            { label: 'Avg Rating',    value: avgRating },
           ].map(stat => (
-            <div key={stat.label} className="bg-white/[0.03] border border-white/5 rounded-xl px-4 py-3 text-center">
-              <div className="text-xl font-bold text-white">{stat.value}</div>
-              <div className="text-[10px] text-white/30 uppercase tracking-wider mt-0.5 font-medium">{stat.label}</div>
+            <div key={stat.label} style={{ background: 'rgba(255,255,255,0.02)', border: `0.5px solid ${stat.highlight ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: stat.highlight ? '#4ade80' : '#fff', letterSpacing: '-0.5px' }}>{stat.value}</div>
+              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: '600', marginTop: '4px' }}>{stat.label}</div>
             </div>
           ))}
         </div>
       )}
 
       {/* Specialty Filter */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] font-semibold uppercase tracking-widest text-white/20 whitespace-nowrap">Specialty</span>
-          <div className="h-px flex-1 bg-white/5" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.2)', whiteSpace: 'nowrap' }}>Specialty</span>
+          <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.06)' }} />
         </div>
-        <div className="flex flex-wrap gap-2">
-          {specialties.map(spec => (
-            <button
-              key={spec}
-              onClick={() => setSelectedSpecialty(spec)}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all
-                ${selectedSpecialty === spec
-                  ? 'bg-blue-500 text-white border-blue-500'
-                  : 'bg-white/[0.03] border-white/8 text-white/40 hover:text-white hover:border-white/20 hover:bg-white/[0.06]'
-                }`}
-            >
-              {spec}
-            </button>
-          ))}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {specialties.map(spec => {
+            const isActive = selectedSpecialty === spec;
+            return (
+              <button key={spec} onClick={() => setSelectedSpecialty(spec)}
+                style={{ padding: '7px 16px', borderRadius: '99px', fontSize: '12px', fontWeight: '500', border: `1px solid ${isActive ? '#3b82f6' : 'rgba(255,255,255,0.08)'}`, background: isActive ? '#3b82f6' : 'rgba(255,255,255,0.03)', color: isActive ? '#fff' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: 'all 0.15s' }}
+                onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.color = '#fff'; }}}
+                onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}}
+              >
+                {spec}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Results */}
-      <div className="w-full">
+      <div style={{ width: '100%' }}>
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-32 gap-6">
-            <div className="relative size-16">
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0', gap: '24px' }}>
+            <div style={{ position: 'relative', width: '56px', height: '56px' }}>
               <div className="absolute inset-0 rounded-full border-2 border-blue-500/20 animate-pulse" />
               <div className="absolute inset-0 rounded-full border-t-2 border-blue-500 animate-spin" />
             </div>
-            <p className="text-white/20 text-[10px] font-semibold uppercase tracking-widest animate-pulse">
-              Scanning network...
-            </p>
+            <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.18em', margin: 0 }}>Scanning network...</p>
           </div>
         ) : filteredDoctors.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 gap-4 text-center">
-            <div className="p-8 bg-white/[0.03] rounded-full border border-white/5">
-              <Stethoscope size={40} className="text-white/20" />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0', gap: '16px', textAlign: 'center' }}>
+            <div style={{ padding: '28px', background: 'rgba(255,255,255,0.03)', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <Stethoscope size={36} style={{ color: 'rgba(255,255,255,0.2)' }} />
             </div>
             <div>
-              <h4 className="text-lg font-semibold text-white/60">No matches found</h4>
-              <p className="text-white/30 text-sm mt-1 max-w-xs">Try a different specialty or search term.</p>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', color: 'rgba(255,255,255,0.5)', margin: '0 0 6px' }}>No matches found</h4>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.25)', margin: 0 }}>Try adjusting your search or filters.</p>
             </div>
+            {hasActiveFilters && (
+              <button onClick={() => { setFeeRange(maxFee); setOnlineOnly(false); setSearchQuery(''); }}
+                style={{ marginTop: '8px', padding: '10px 20px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+                Clear all filters
+              </button>
+            )}
           </div>
         ) : (
           <>
-            {/* Result count */}
-            <div className="flex items-center gap-3 mb-5">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-white/20">Results</span>
-              <div className="h-px flex-1 bg-white/5" />
-              <span className="text-[10px] text-white/20">{filteredDoctors.length} doctors</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+              <span style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.2)' }}>Results</span>
+              <div style={{ flex: 1, height: '0.5px', background: 'rgba(255,255,255,0.05)' }} />
+              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)' }}>{filteredDoctors.length} doctors</span>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
               {filteredDoctors.map(doc => (
                 <DoctorCard key={doc._id} doctor={doc} />
               ))}
@@ -193,98 +291,91 @@ export default function FindDoctors() {
 }
 
 function DoctorCard({ doctor }) {
-  const name = doctor.userId?.name || 'Medical Specialist';
-  const { bg, text } = getAvatarColor(name);
-  const initials = getInitials(name);
-  const { rating, isAvailable, busyHours } = getMockMeta(doctor._id || '');
-
-  // Since specialization is a single value (e.g. "Cardiologist"),
-  // show it as a tag + derive related conditions from it
+  const name           = doctor.userId?.name || 'Medical Specialist';
+  const { bg, text }   = getAvatarColor(name);
+  const initials       = getInitials(name);
   const specialization = doctor.specialization || '';
-  const relatedConditions = {
-    'Cardiologist': ['Heart failure', 'Arrhythmia'],
-    'Dermatologist': ['Acne', 'Psoriasis'],
-    'Neurologist': ['Migraine', 'Epilepsy'],
-    'Pediatrician': ['Child health', 'Vaccines'],
-    'Psychiatrist': ['Anxiety', 'Depression'],
-    'Orthopedic': ['Joint pain', 'Fractures'],
-    'General Physician': ['Fever', 'Diabetes'],
-    'Gynecologist': ['Prenatal', 'PCOS'],
-  };
-  const tags = relatedConditions[specialization] || [];
+  const tags           = relatedConditions[specialization] || [specialization];
 
-  // Fee: show 0 as "Free" and falsy as "—"
-  const feeDisplay = doctor.consultationFee > 0
-    ? `₹${doctor.consultationFee}`
-    : doctor.consultationFee === 0
-    ? 'Free'
-    : '—';
+  // Real fee from doctor.fee
+  const fee = doctor.fee > 0
+    ? `₹${doctor.fee.toLocaleString()}`
+    : doctor.fee === 0 ? 'Free' : '—';
+
+  // Real rating from doctor.rating
+  const rating = doctor.rating > 0 ? Number(doctor.rating).toFixed(1) : '—';
+
+  // Real online status from doctor.isOnline (set by Socket.io)
+  const isOnline = doctor.isOnline === true;
 
   return (
-    <div className="group flex flex-col bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 gap-5 hover:border-white/[0.14] hover:bg-white/[0.05] transition-all duration-200">
-
-      {/* Top row: avatar + name + availability */}
-      <div className="flex items-center gap-4">
-        <div className={`size-12 rounded-full ${bg} flex items-center justify-center shrink-0`}>
-          <span className={`text-sm font-bold ${text}`}>{initials}</span>
+    <div
+      style={{ display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.07)', borderRadius: '20px', padding: '24px', gap: '20px', transition: 'all 0.2s' }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.13)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+    >
+      {/* Top: avatar + name + online status */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <div style={{ width: '46px', height: '46px', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '14px', fontWeight: '700', color: text }}>{initials}</span>
+          </div>
+          {/* Online indicator dot on avatar */}
+          <span style={{ position: 'absolute', bottom: '1px', right: '1px', width: '11px', height: '11px', borderRadius: '50%', background: isOnline ? '#4ade80' : 'rgba(255,255,255,0.15)', border: '2px solid #050608' }} />
         </div>
-        <div className="flex-1 min-w-0">
-          <h4 className="text-[15px] font-semibold text-white">Dr. {name}</h4>
-          <p className="text-xs text-blue-400/80 mt-0.5">{specialization || 'Specialist'}</p>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h4 style={{ fontSize: '15px', fontWeight: '600', color: '#fff', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Dr. {name}</h4>
+          <p style={{ fontSize: '12px', color: 'rgba(59,130,246,0.8)', margin: '3px 0 0' }}>{specialization || 'Specialist'}</p>
         </div>
-        <div className={`flex items-center gap-1.5 shrink-0 px-2.5 py-1 rounded-full border ${isAvailable ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-amber-500/20 bg-amber-500/10'}`}>
-          <span className={`size-1.5 rounded-full ${isAvailable ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-          <span className={`text-[10px] font-semibold ${isAvailable ? 'text-emerald-400' : 'text-amber-400'}`}>
-            {isAvailable ? 'Available' : `Busy · ${busyHours}h`}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '99px', border: `1px solid ${isOnline ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}`, background: isOnline ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.04)', flexShrink: 0 }}>
+          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: isOnline ? '#4ade80' : 'rgba(255,255,255,0.2)' }} />
+          <span style={{ fontSize: '10px', fontWeight: '600', color: isOnline ? '#4ade80' : 'rgba(255,255,255,0.3)' }}>
+            {isOnline ? 'Online' : 'Offline'}
           </span>
         </div>
       </div>
 
-      {/* Condition tags */}
-      <div className="flex flex-wrap gap-2">
+      {/* Tags */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
         {tags.map(tag => (
-          <span key={tag} className="px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.07] text-[11px] text-white/40 font-medium">
+          <span key={tag} style={{ padding: '4px 12px', borderRadius: '99px', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: '500' }}>
             {tag}
           </span>
         ))}
-        {tags.length === 0 && (
-          <span className="px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.07] text-[11px] text-white/40 font-medium">
-            {specialization}
-          </span>
-        )}
       </div>
 
       {/* Divider */}
-      <div className="h-px bg-white/[0.06]" />
+      <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.06)' }} />
 
-      {/* Meta row: experience | fee | rating */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[9px] uppercase tracking-widest text-white/25 font-semibold">Experience</span>
-          <span className="text-sm font-bold text-white">
-            {doctor.experience ? `${doctor.experience}y` : '—'}
-          </span>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[9px] uppercase tracking-widest text-white/25 font-semibold">Fee</span>
-          <span className="text-sm font-bold text-white">{feeDisplay}</span>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[9px] uppercase tracking-widest text-white/25 font-semibold">Rating</span>
-          <div className="flex items-center gap-1">
-            <Star size={11} className="text-amber-400 fill-amber-400" />
-            <span className="text-sm font-bold text-white">{rating}</span>
+      {/* Meta: experience | fee | rating */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+        {[
+          { label: 'Experience', value: doctor.experience ? `${doctor.experience}y` : '—' },
+          { label: 'Fee',        value: fee },
+          { label: 'Rating',     value: rating, isRating: true },
+        ].map(item => (
+          <div key={item.label} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.22)', fontWeight: '600' }}>{item.label}</span>
+            {item.isRating ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Star size={11} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                <span style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>{item.value}</span>
+              </div>
+            ) : (
+              <span style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>{item.value}</span>
+            )}
           </div>
-        </div>
+        ))}
       </div>
 
-      {/* Book button — matches card bg, arrow slides on hover */}
+      {/* Book button */}
       <Link
         href={`/dashboard/patient/doctors/${doctor._id}`}
-        className="group/btn flex items-center justify-center gap-2 py-3 rounded-xl bg-white/[0.06] border border-white/[0.08] hover:bg-white/[0.10] hover:border-white/[0.15] text-white text-xs font-semibold transition-all duration-200 active:scale-[0.98]"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.09)', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none', transition: 'all 0.2s' }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
       >
-        Book Appointment
-        <ArrowRight size={13} className="group-hover/btn:translate-x-1 transition-transform duration-200" />
+        Book Appointment <ArrowRight size={14} />
       </Link>
     </div>
   );

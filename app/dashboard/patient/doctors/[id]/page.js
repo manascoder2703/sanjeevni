@@ -42,6 +42,7 @@ export default function DoctorProfilePage() {
       const res = await fetch('/api/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials:'include',
         body: JSON.stringify({ doctorId: id, date: selectedDate, timeSlot: selectedSlot }),
       });
       const data = await res.json();

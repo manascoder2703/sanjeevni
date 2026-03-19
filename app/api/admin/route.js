@@ -8,7 +8,7 @@ import { getUserFromRequest } from '@/lib/auth';
 export async function GET(request) {
   try {
     await connectDB();
-    const user = getUserFromRequest(request);
+    const user = await getUserFromRequest(request);
     if (!user || user.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -29,7 +29,7 @@ export async function GET(request) {
 export async function PATCH(request) {
   try {
     await connectDB();
-    const user = getUserFromRequest(request);
+    const user = await getUserFromRequest(request);
     if (!user || user.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     const { doctorId, action } = await request.json();
     

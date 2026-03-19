@@ -5,7 +5,7 @@ import { getUserFromRequest } from '@/lib/auth';
 
 export async function GET(request) {
   try {
-    const decoded = getUserFromRequest(request);
+    const decoded = await getUserFromRequest(request);
     if (!decoded || decoded.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     await connectDB();
@@ -21,7 +21,7 @@ export async function GET(request) {
 
 export async function PUT(request) {
   try {
-    const decoded = getUserFromRequest(request);
+    const decoded = await getUserFromRequest(request);
     if (!decoded || decoded.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     await connectDB();

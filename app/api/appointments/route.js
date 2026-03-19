@@ -1,3 +1,5 @@
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/authOptions';
 import { NextResponse } from 'next/server';
 import { sendRealtimeNotification } from '@/lib/notifications';
 import connectDB from '@/lib/mongodb';
@@ -11,8 +13,16 @@ import { v4 as uuidv4 } from 'uuid';
 export async function GET(request) {
   try {
     await connectDB();
-    const user = getUserFromRequest(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    let user = await getUserFromRequest(request);
+    if (!user) {
+      const session = await getServerSession(authOptions);
+      console.log('SESSION DEBUG:', JSON.stringify(session, null, 2));
+      console.log('SESSION DEBUG:', JSON.stringify(session, null, 2));
+      console.log('SESSION DEBUG:', JSON.stringify(session, null, 2));
+      console.log('SESSION DEBUG:', JSON.stringify(session, null, 2));
+      if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      user = { userId: session.user.id, role: session.user.role || 'patient' };
+    }
 
     let appointments;
     if (user.role === 'patient') {
@@ -44,8 +54,18 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     await connectDB();
-    const user = getUserFromRequest(request);
-    if (!user || user.role !== 'patient') {
+    let user = await getUserFromRequest(request);
+    console.log('USER DEBUG:', JSON.stringify(user, null, 2));
+    if (!user) {
+      const session = await getServerSession(authOptions);
+      console.log('SESSION DEBUG:', JSON.stringify(session, null, 2));
+      console.log('SESSION DEBUG:', JSON.stringify(session, null, 2));
+      console.log('SESSION DEBUG:', JSON.stringify(session, null, 2));
+      console.log('SESSION DEBUG:', JSON.stringify(session, null, 2));
+      if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      user = { userId: session.user.id, role: session.user.role || 'patient' };
+    }
+    if (user.role !== 'patient') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

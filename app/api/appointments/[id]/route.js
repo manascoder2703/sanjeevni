@@ -7,7 +7,7 @@ import { sendRealtimeNotification } from '@/lib/notifications';
 export async function PATCH(request, { params }) {
   try {
     await connectDB();
-    const user = getUserFromRequest(request);
+    const user = await getUserFromRequest(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { status } = await request.json();
     const resolvedParams = await params;
