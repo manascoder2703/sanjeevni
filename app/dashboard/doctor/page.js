@@ -42,6 +42,7 @@ function getStatusStyle(status) {
     case 'pending':   return { label: 'Pending',   color: '#fbbf24', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', dot: '#fbbf24' };
     case 'completed': return { label: 'Completed', color: '#4ade80', bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  dot: '#4ade80' };
     case 'cancelled': return { label: 'Cancelled', color: '#fb7185', bg: 'rgba(244,63,94,0.1)',  border: 'rgba(244,63,94,0.2)',  dot: '#fb7185' };
+    case 'rejected':  return { label: 'Rejected',  color: '#f43f5e', bg: 'rgba(244,63,94,0.15)', border: 'rgba(244,63,94,0.3)',  dot: '#f43f5e' };
     default:          return { label: status,      color: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)', dot: 'rgba(255,255,255,0.4)' };
   }
 }
@@ -195,7 +196,7 @@ export default function DoctorDashboard() {
         credentials: 'include',
         body: JSON.stringify({ status }),
       });
-      toast.success(status === 'confirmed' ? 'Appointment accepted' : status === 'cancelled' ? 'Appointment rejected' : 'Marked as done');
+      toast.success(status === 'confirmed' ? 'Appointment accepted' : status === 'rejected' ? 'Appointment rejected' : status === 'cancelled' ? 'Appointment cancelled' : 'Marked as done');
       fetchAppointments();
     } catch (e) {
       toast.error('Failed to update status');
@@ -230,7 +231,8 @@ export default function DoctorDashboard() {
   const pendingApts       = appointments.filter(a => a.status === 'pending');
   const confirmedApts     = appointments.filter(a => a.status === 'confirmed');
   const completedApts     = appointments.filter(a => a.status === 'completed');
-  const cancelledApts     = appointments.filter(a => a.status === 'cancelled');
+  const cancelledApts     = appointments.filter(a => a.status === 'cancelled' || a.status === 'rejected');
+  const rejectedOnlyApts  = appointments.filter(a => a.status === 'rejected');
 
   const tabData = { pending: pendingApts, confirmed: confirmedApts, completed: completedApts, cancelled: cancelledApts };
 
@@ -320,7 +322,7 @@ export default function DoctorDashboard() {
               {todayAppointments.map(apt => (
                 <TodayRow key={apt._id} apt={apt}
                   onAccept={id => updateStatus(id, 'confirmed')}
-                  onReject={id => updateStatus(id, 'cancelled')}
+                  onReject={id => updateStatus(id, 'rejected')}
                   onDone={id => updateStatus(id, 'completed')}
                   onSummary={generateSummary}
                 />

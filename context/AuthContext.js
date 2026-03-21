@@ -5,6 +5,24 @@ import { useSession, signOut as nextAuthSignOut } from 'next-auth/react';
 
 const AuthContext = createContext(null);
 
+function normalizeUserShape(rawUser) {
+  if (!rawUser) return null;
+
+  const normalizedId =
+    rawUser.id ||
+    rawUser.userId ||
+    rawUser._id ||
+    rawUser?.id?.toString?.() ||
+    rawUser?.userId?.toString?.() ||
+    rawUser?._id?.toString?.();
+
+  return {
+    ...rawUser,
+    id: normalizedId,
+    userId: normalizedId,
+  };
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,7 +39,7 @@ export function AuthProvider({ children }) {
       try {
         const stored = localStorage.getItem('sanjeevni_user');
         if (stored) {
-          const parsedUser = JSON.parse(stored);
+          const parsedUser = normalizeUserShape(JSON.parse(stored));
           setUser(parsedUser);
         }
       } catch (error) {
@@ -38,13 +56,13 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (session?.user) {
-      const userData = {
+      const userData = normalizeUserShape({
         name: session.user.name,
         email: session.user.email,
         role: session.user.role || 'patient',
         avatar: session.user.image,
         id: session.user.id
-      };
+      });
       setUser(userData);
       localStorage.setItem('sanjeevni_user', JSON.stringify(userData));
     }
@@ -76,10 +94,11 @@ export function AuthProvider({ children }) {
         return { error: data.error || 'Login failed' };
       }
 
-      setUser(data.user);
-      localStorage.setItem('sanjeevni_user', JSON.stringify(data.user));
-      console.log('Login successful for:', data.user.email);
-      return { user: data.user };
+      const normalizedUser = normalizeUserShape(data.user);
+      setUser(normalizedUser);
+      localStorage.setItem('sanjeevni_user', JSON.stringify(normalizedUser));
+      console.log('Login successful for:', normalizedUser.email);
+      return { user: normalizedUser };
     } catch (error) {
       console.error('Login fetch error:', error);
       return { error: 'Network error: Please try again' };
@@ -113,9 +132,10 @@ export function AuthProvider({ children }) {
         return { error: data.error || data.details || 'Registration failed' };
       }
 
-      setUser(data.user);
-      localStorage.setItem('sanjeevni_user', JSON.stringify(data.user));
-      return { user: data.user };
+      const normalizedUser = normalizeUserShape(data.user);
+      setUser(normalizedUser);
+      localStorage.setItem('sanjeevni_user', JSON.stringify(normalizedUser));
+      return { user: normalizedUser };
     } catch (error) {
       console.error('Registration fetch/logic error:', error);
       return { error: 'Network error: Please try again' };
@@ -127,8 +147,9 @@ export function AuthProvider({ children }) {
       const res = await fetch('/api/profile/patient');
       const data = await res.json();
       if (res.ok && data.user) {
-        setUser(data.user);
-        localStorage.setItem('sanjeevni_user', JSON.stringify(data.user));
+        const normalizedUser = normalizeUserShape(data.user);
+        setUser(normalizedUser);
+        localStorage.setItem('sanjeevni_user', JSON.stringify(normalizedUser));
       }
     } catch (error) {
       console.error('Refresh user error:', error);

@@ -1,0 +1,564 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { io } from 'socket.io-client';
+import toast from 'react-hot-toast';
+import {
+  CalendarPlus,
+  FileText,
+  Paperclip,
+  PhoneCall,
+  Search,
+  Send,
+  ShieldAlert,
+  TestTubeDiagonal,
+  UserRound,
+  X,
+} from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+
+const ACCENT = '#18b6a2';
+const SHELL_BG = '#06090f';
+const LEFT_BG = '#0b1017';
+
+const QUICK_ACTIONS = [
+  { key: 'follow-up', label: 'Book follow-up', icon: CalendarPlus, text: 'Let us plan a follow-up consultation to review your progress and symptoms.' },
+  { key: 'prescription', label: 'Send prescription', icon: FileText, text: 'I am sharing your prescription details. Please follow the dosage instructions carefully.' },
+  { key: 'tests', label: 'Request test report', icon: TestTubeDiagonal, text: 'Please share your latest test reports so I can review them and guide you further.' },
+];
+
+const AVATARS = [
+  { bg: '#dbf3ed', text: '#0f766e' },
+  { bg: '#e7eefb', text: '#1d4ed8' },
+  { bg: '#f7ead6', text: '#a16207' },
+  { bg: '#efe8fb', text: '#7c3aed' },
+];
+
+function initials(name = '') {
+  return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function avatarTone(name = '') {
+  return AVATARS[name.charCodeAt(0) % AVATARS.length] || AVATARS[0];
+}
+
+function shortTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  const now = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === now.toDateString()) return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function messageTime(value) {
+  if (!value) return '';
+  return new Date(value).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function dayLabel(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return `Today, ${date.toLocaleDateString([], { month: 'long', day: 'numeric' })}`;
+  }
+  return date.toLocaleDateString([], { month: 'long', day: 'numeric' });
+}
+
+function addMessageIfMissing(messages = [], nextMessage) {
+  if (!nextMessage?._id || messages.some((message) => message._id === nextMessage._id)) return messages;
+  return [...messages, nextMessage];
+}
+
+export default function PortalChatWorkspace({ viewerRole }) {
+  const { user } = useAuth();
+  const [conversations, setConversations] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [conversationLoading, setConversationLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [tab, setTab] = useState('active');
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [typingUser, setTypingUser] = useState('');
+  const [presence, setPresence] = useState({});
+  const [showProfile, setShowProfile] = useState(false);
+
+  const socketRef = useRef(null);
+  const selectedRef = useRef(null);
+  const typingTimerRef = useRef(null);
+  const endRef = useRef(null);
+
+  const allLabel = viewerRole === 'doctor' ? 'All patients' : 'All doctors';
+  const searchLabel = viewerRole === 'doctor' ? 'Search patients...' : 'Search doctors...';
+  const selfLabel = viewerRole === 'doctor' ? 'Doctor Portal' : 'Patient Portal';
+
+  const fetchConversations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/chat/conversations', { credentials: 'include', cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load chats');
+      const next = (data.conversations || []).filter((conversation) =>
+        conversation.counterpart?.role === (viewerRole === 'doctor' ? 'patient' : 'doctor')
+      );
+      setConversations(next);
+      setPresence((current) => {
+        const merged = { ...current };
+        next.forEach((conversation) => {
+          if (typeof merged[conversation.counterpart.id] === 'undefined') {
+            merged[conversation.counterpart.id] = !!conversation.counterpart.initialOnline;
+          }
+        });
+        return merged;
+      });
+      setSelectedId((current) => (current && next.some((item) => item._id === current) ? current : next[0]?._id || null));
+    } catch (error) {
+      toast.error(error.message || 'Failed to load chats');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const openConversation = useCallback(async (conversationId, shouldMarkRead = true) => {
+    if (!conversationId) {
+      setSelectedConversation(null);
+      return;
+    }
+
+    setConversationLoading(true);
+    try {
+      const res = await fetch(`/api/chat/conversations/${conversationId}`, { credentials: 'include', cache: 'no-store' });
+      const data = await res.json();
+      if (res.status === 404) {
+        setSelectedConversation(null);
+        setSelectedId(null);
+        fetchConversations();
+        return;
+      }
+      if (!res.ok) throw new Error(data.error || 'Failed to load chat');
+      let conversation = data.conversation;
+
+      if (shouldMarkRead && conversation.unreadCount > 0) {
+        const readRes = await fetch(`/api/chat/conversations/${conversationId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ markRead: true }),
+        });
+        const readData = await readRes.json();
+        if (readRes.ok && readData.conversation) conversation = readData.conversation;
+        fetchConversations();
+      }
+
+      setSelectedConversation(conversation);
+    } catch (error) {
+      if (error.message !== 'Conversation not found') {
+        toast.error(error.message || 'Failed to open chat');
+      }
+    } finally {
+      setConversationLoading(false);
+    }
+  }, [fetchConversations]);
+
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
+
+  useEffect(() => {
+    const intervalId = setInterval(fetchConversations, 20000);
+    return () => clearInterval(intervalId);
+  }, [fetchConversations]);
+
+  useEffect(() => {
+    selectedRef.current = selectedId;
+  }, [selectedId]);
+
+  useEffect(() => {
+    openConversation(selectedId);
+  }, [openConversation, selectedId]);
+
+  useEffect(() => {
+    const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001');
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      if (user?.id) socket.emit('identify', { userId: user.id });
+      if (selectedRef.current) socket.emit('chat:join', { conversationId: selectedRef.current });
+    });
+
+    socket.on('presence:snapshot', ({ presence: snapshot = {} }) => {
+      setPresence((current) => ({ ...current, ...snapshot }));
+    });
+
+    socket.on('presence:changed', ({ userId, isOnline }) => {
+      setPresence((current) => ({ ...current, [userId]: isOnline }));
+    });
+
+    socket.on('chat:conversation-updated', ({ conversationId }) => {
+      fetchConversations();
+      if (conversationId && conversationId === selectedRef.current) {
+        openConversation(conversationId, false);
+      }
+    });
+
+    socket.on('chat:message', ({ conversationId, message: nextMessage }) => {
+      if (conversationId !== selectedRef.current) return;
+      setSelectedConversation((current) => current ? {
+        ...current,
+        messages: addMessageIfMissing(current.messages, {
+          ...nextMessage,
+          mine: String(nextMessage.senderId) === String(user?.id),
+        }),
+      } : current);
+    });
+
+    socket.on('chat:typing', ({ conversationId, userId, userName, isTyping }) => {
+      if (conversationId !== selectedRef.current || String(userId) === String(user?.id)) return;
+      setTypingUser(isTyping ? userName : '');
+    });
+
+    socket.on('chat:read', ({ conversationId, messageIds = [], readByUserId }) => {
+      if (conversationId !== selectedRef.current || String(readByUserId) === String(user?.id)) return;
+      setSelectedConversation((current) => current ? {
+        ...current,
+        messages: current.messages.map((entry) => (
+          messageIds.includes(entry._id) ? { ...entry, readAt: new Date().toISOString() } : entry
+        )),
+      } : current);
+    });
+
+    return () => {
+      if (selectedRef.current) socket.emit('chat:leave', { conversationId: selectedRef.current });
+      socket.disconnect();
+    };
+  }, [fetchConversations, openConversation, user?.id]);
+
+  useEffect(() => {
+    if (!socketRef.current || !selectedId) return undefined;
+    socketRef.current.emit('chat:join', { conversationId: selectedId });
+    return () => socketRef.current?.emit('chat:leave', { conversationId: selectedId });
+  }, [selectedId]);
+
+  const watchedIds = useMemo(() => conversations.map((item) => item.counterpart.id).filter(Boolean), [conversations]);
+
+  useEffect(() => {
+    if (!socketRef.current || watchedIds.length === 0) return;
+    socketRef.current.emit('presence:query', { userIds: watchedIds });
+  }, [watchedIds]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [selectedConversation?.messages, typingUser]);
+
+  const filteredConversations = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return conversations.filter((conversation) => {
+      if (tab === 'active' && !conversation.active) return false;
+      if (!query) return true;
+      return conversation.counterpart.name.toLowerCase().includes(query) || conversation.lastMessageText.toLowerCase().includes(query);
+    });
+  }, [conversations, search, tab]);
+
+  const activeCount = useMemo(() => conversations.filter((item) => item.active).length, [conversations]);
+  const selectedOnline = selectedConversation ? (presence[selectedConversation.counterpart.id] ?? selectedConversation.counterpart.initialOnline) : false;
+
+  const emitTyping = useCallback((isTyping) => {
+    if (!socketRef.current || !selectedId || !user?.id) return;
+    socketRef.current.emit('chat:typing', {
+      conversationId: selectedId,
+      userId: user.id,
+      userName: user.name,
+      isTyping,
+    });
+  }, [selectedId, user?.id, user?.name]);
+
+  const onChangeMessage = (event) => {
+    const value = event.target.value;
+    setMessage(value);
+    if (!selectedId) return;
+    emitTyping(!!value.trim());
+    clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => emitTyping(false), 1200);
+  };
+
+  const sendMessage = useCallback(async (overrideText, kind = 'text') => {
+    const text = (typeof overrideText === 'string' ? overrideText : message).trim();
+    if (!text || !selectedId) return;
+    setSending(true);
+    setMessage('');
+    clearTimeout(typingTimerRef.current);
+    emitTyping(false);
+
+    try {
+      const res = await fetch(`/api/chat/conversations/${selectedId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ text, kind }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send message');
+      setSelectedConversation((current) => current ? {
+        ...current,
+        messages: addMessageIfMissing(current.messages, data.message),
+      } : current);
+      fetchConversations();
+    } catch (error) {
+      toast.error(error.message || 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  }, [emitTyping, fetchConversations, message, selectedId]);
+
+  const toggleUrgent = async () => {
+    if (viewerRole !== 'doctor' || !selectedConversation) return;
+    const res = await fetch(`/api/chat/conversations/${selectedConversation._id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ urgent: !selectedConversation.urgent }),
+    });
+    const data = await res.json();
+    if (!res.ok) return toast.error(data.error || 'Failed to update urgency');
+    setSelectedConversation(data.conversation);
+    fetchConversations();
+  };
+
+  const entries = useMemo(() => {
+    const items = [];
+    let currentDivider = '';
+    (selectedConversation?.messages || []).forEach((entry) => {
+      const divider = dayLabel(entry.createdAt);
+      if (divider !== currentDivider) {
+        currentDivider = divider;
+        items.push({ type: 'divider', id: divider, label: divider });
+      }
+      items.push({ type: 'message', id: entry._id, message: entry });
+    });
+    return items;
+  }, [selectedConversation?.messages]);
+
+  const selfTone = avatarTone(user?.name || 'S');
+  const otherTone = avatarTone(selectedConversation?.counterpart.name || 'A');
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        minHeight: '100%',
+        alignSelf: 'stretch',
+      }}
+    >
+      <style>{`
+        .chat-workspace { height:100%; min-height:0; width:100%; display:flex; }
+        .chat-shell { display:grid; grid-template-columns:minmax(380px, 500px) minmax(0,1fr); min-height:100%; height:100%; width:100%; overflow:hidden; background:linear-gradient(180deg, rgba(7,10,16,0.98), rgba(5,8,13,0.99)); }
+        .chat-scroll::-webkit-scrollbar { width:8px; }
+        .chat-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:999px; }
+        .chat-tab { flex:1; padding:18px 20px; border:none; background:transparent; color:rgba(255,255,255,0.72); font-size:16px; border-bottom:3px solid transparent; cursor:pointer; }
+        .chat-tab.active { color:${ACCENT}; border-bottom-color:${ACCENT}; }
+        .chat-row { transition: all 0.2s ease; }
+        .chat-row:hover { background: rgba(255,255,255,0.06); transform: translateX(2px); }
+        .chat-row.selected { background: linear-gradient(90deg, rgba(24,182,162,0.15), rgba(59,130,246,0.05)); border-left: 4px solid ${ACCENT} !important; }
+        .chat-chip { transition: all 0.2s ease; }
+        .chat-chip:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .profile-btn { transition: all 0.2s ease; }
+        .profile-btn:hover { background: rgba(255,255,255,0.08) !important; color: white !important; border-color: rgba(255,255,255,0.2) !important; }
+        .action-btn { transition: all 0.2s ease; }
+        .action-btn:hover:not(:disabled) { background: rgba(255,255,255,0.08) !important; color: white !important; }
+        .close-btn { transition: all 0.2s ease; }
+        .close-btn:hover { background: rgba(255,255,255,0.1) !important; transform: rotate(90deg); }
+        @media (max-width: 1100px) { .chat-shell { grid-template-columns:1fr; } .chat-left { border-right:none !important; border-bottom:1px solid rgba(255,255,255,0.12); max-height:42vh; } }
+      `}</style>
+
+      <div className="chat-workspace">
+      <div className="chat-shell">
+        <aside className="chat-left" style={{ background: 'linear-gradient(180deg, rgba(10,14,21,0.98), rgba(8,11,18,0.98))', borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '28px 28px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ width: 72, height: 72, borderRadius: '50%', background: selfTone.bg, color: selfTone.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 800 }}>{initials(user?.name || 'S')}</div>
+                <div>
+                  <h2 style={{ margin: 0, color: 'white', fontSize: 24, fontWeight: 800 }}>{user?.name || 'Sanjeevni User'}</h2>
+                  <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.72)', fontSize: 18 }}>{selfLabel}</p>
+                </div>
+              </div>
+              <span style={{ width: 18, height: 18, borderRadius: '50%', background: ACCENT }} />
+            </div>
+
+            <div style={{ marginTop: 22, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, borderRadius: 18, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.025)' }}>
+              <Search size={22} color="rgba(255,255,255,0.56)" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={searchLabel} style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', color: 'white', fontSize: 18 }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <button type="button" className={`chat-tab ${tab === 'active' ? 'active' : ''}`} onClick={() => setTab('active')}>Active ({activeCount})</button>
+            <button type="button" className={`chat-tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>{allLabel}</button>
+          </div>
+
+          <div className="chat-scroll" style={{ overflowY: 'auto', flex: 1 }}>
+            {loading ? (
+              <div style={{ padding: 28, color: 'rgba(255,255,255,0.56)' }}>Loading chats...</div>
+            ) : filteredConversations.length === 0 ? (
+              <div style={{ padding: 28, color: 'rgba(255,255,255,0.56)', lineHeight: 1.7 }}>No conversations yet. Once appointments exist, your chat inbox will appear here.</div>
+            ) : filteredConversations.map((conversation) => {
+              const tone = avatarTone(conversation.counterpart.name);
+              const online = presence[conversation.counterpart.id] ?? conversation.counterpart.initialOnline;
+              return (
+                <button key={conversation._id} type="button" className={`chat-row ${conversation._id === selectedId ? 'selected' : ''}`} onClick={() => { setSelectedId(conversation._id); setShowProfile(false); }} style={{ width: '100%', padding: '22px 26px', display: 'flex', gap: 16, border: 'none', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div style={{ width: 66, height: 66, borderRadius: '50%', background: tone.bg, color: tone.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800 }}>{initials(conversation.counterpart.name)}</div>
+                    <span style={{ position: 'absolute', right: 2, bottom: 2, width: 14, height: 14, borderRadius: '50%', background: online ? ACCENT : 'rgba(255,255,255,0.24)', border: `2px solid ${LEFT_BG}` }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <h3 style={{ margin: 0, color: 'white', fontSize: 19, fontWeight: 800 }}>{conversation.counterpart.name}</h3>
+                        <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.62)', fontSize: 16, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{conversation.lastMessageText}</p>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                        <span style={{ color: 'rgba(255,255,255,0.56)', fontSize: 16 }}>{shortTime(conversation.lastMessageAt)}</span>
+                        {conversation.unreadCount > 0 && <span style={{ minWidth: 34, height: 34, borderRadius: 17, padding: '0 10px', background: ACCENT, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>{conversation.unreadCount}</span>}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        <section style={{ background: 'linear-gradient(180deg, rgba(7,10,16,0.96), rgba(5,8,12,0.99))', display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative' }}>
+          <div
+            style={{
+              position: 'absolute',
+              inset: '0 0 auto 0',
+              height: 220,
+              background: 'radial-gradient(circle at top left, rgba(24,182,162,0.12), transparent 42%), radial-gradient(circle at top right, rgba(59,130,246,0.08), transparent 36%)',
+              pointerEvents: 'none',
+            }}
+          />
+          {selectedConversation ? (
+            <>
+              <header style={{ padding: '20px 28px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', background: 'rgba(255,255,255,0.015)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ width: 60, height: 60, borderRadius: '50%', background: otherTone.bg, color: otherTone.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 22 }}>{initials(selectedConversation.counterpart.name)}</div>
+                    <span style={{ position: 'absolute', right: 1, bottom: 1, width: 14, height: 14, borderRadius: '50%', background: selectedOnline ? ACCENT : 'rgba(255,255,255,0.24)', border: `2px solid ${SHELL_BG}` }} />
+                  </div>
+                  <div>
+                    <h2 style={{ margin: 0, color: 'white', fontSize: 22, fontWeight: 800 }}>{selectedConversation.counterpart.name}</h2>
+                    <p style={{ margin: '4px 0 0', color: selectedOnline ? ACCENT : 'rgba(255,255,255,0.56)', fontSize: 16 }}>
+                      {selectedOnline ? 'Online' : 'Offline'}
+                      {viewerRole === 'doctor'
+                        ? ` - Patient #${selectedConversation.counterpart.referenceCode || '10482'}`
+                        : ` - ${selectedConversation.counterpart.specialization || 'Doctor'}`}
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  {selectedConversation.urgent && <span style={{ padding: '10px 16px', borderRadius: 999, background: 'rgba(255,234,234,0.96)', color: '#b63636', fontWeight: 700, fontSize: 16 }}>Urgent</span>}
+                  {selectedConversation.latestAppointmentStatus === 'confirmed' && selectedConversation.latestRoomId ? (
+                    <Link href={`/video/${selectedConversation.latestRoomId}`} className="action-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.88)', textDecoration: 'none', fontSize: 16 }}><PhoneCall size={20} />Call</Link>
+                  ) : (
+                    <button type="button" disabled style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.34)', fontSize: 16 }}><PhoneCall size={20} />Call</button>
+                  )}
+                  <button type="button" onClick={() => setShowProfile(true)} className="profile-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.88)', fontSize: 16, cursor: 'pointer' }}><UserRound size={20} />Profile</button>
+                </div>
+              </header>
+
+              <div className="chat-scroll" style={{ flex: 1, overflowY: 'auto', padding: '28px 28px 12px', background: 'radial-gradient(circle at top left, rgba(24,182,162,0.08), transparent 26%), radial-gradient(circle at bottom right, rgba(59,130,246,0.08), transparent 24%)' }}>
+                {conversationLoading ? (
+                  <div style={{ color: 'rgba(255,255,255,0.6)' }}>Loading messages...</div>
+                ) : (
+                  entries.map((entry) => entry.type === 'divider' ? (
+                    <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: 18, margin: '10px 0 26px' }}>
+                      <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.14)' }} />
+                      <span style={{ color: 'rgba(255,255,255,0.68)', fontSize: 14, fontWeight: 600 }}>{entry.label}</span>
+                      <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.14)' }} />
+                    </div>
+                  ) : (
+                    <div key={entry.id} style={{ marginBottom: 18 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, justifyContent: entry.message.mine ? 'flex-end' : 'flex-start' }}>
+                        {!entry.message.mine && <div style={{ width: 54, height: 54, borderRadius: '50%', background: otherTone.bg, color: otherTone.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800 }}>{initials(selectedConversation.counterpart.name)}</div>}
+                        <div style={{ maxWidth: '72%' }}>
+                          <div style={{ padding: '18px 22px', borderRadius: 22, background: entry.message.mine ? ACCENT : 'rgba(255,255,255,0.06)', color: 'white', fontSize: 18, lineHeight: 1.6, border: `1px solid ${entry.message.mine ? ACCENT : 'rgba(255,255,255,0.08)'}`, boxShadow: entry.message.mine ? '0 16px 36px rgba(24,182,162,0.16)' : 'none' }}>{entry.message.text}</div>
+                          <div style={{ marginTop: 8, display: 'flex', justifyContent: entry.message.mine ? 'flex-end' : 'flex-start', gap: 6, color: 'rgba(255,255,255,0.56)', fontSize: 14 }}>
+                            <span>{messageTime(entry.message.createdAt)}</span>
+                            {entry.message.mine && <span>· {entry.message.readAt ? 'Read' : 'Delivered'}</span>}
+                          </div>
+                        </div>
+                        {entry.message.mine && <div style={{ width: 54, height: 54, borderRadius: '50%', background: ACCENT, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800 }}>{initials(user?.name || 'S')}</div>}
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {typingUser && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <div style={{ padding: '14px 18px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', display: 'inline-flex', gap: 10 }}>
+                      {[0, 1, 2].map((dot) => <span key={dot} style={{ width: 12, height: 12, borderRadius: '50%', background: ACCENT }} />)}
+                    </div>
+                  </div>
+                )}
+                <div ref={endRef} />
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '16px 28px 26px', background: 'rgba(255,255,255,0.015)' }}>
+                {viewerRole === 'doctor' && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
+                    {QUICK_ACTIONS.map((action) => (
+                      <button key={action.key} type="button" className="chat-chip" onClick={() => sendMessage(action.text, 'quick-action')} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderRadius: 999, border: '1px solid rgba(203,255,244,0.42)', background: '#dff8ef', color: '#0f766e', fontSize: 15, cursor: 'pointer' }}><action.icon size={18} />{action.label}</button>
+                    ))}
+                    <button type="button" className="chat-chip" onClick={toggleUrgent} style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderRadius: 999, border: '1px solid rgba(243,186,82,0.8)', background: selectedConversation.urgent ? 'rgba(243,186,82,0.16)' : '#fff4df', color: '#a16207', fontSize: 15, cursor: 'pointer' }}><ShieldAlert size={18} />{selectedConversation.urgent ? 'Remove urgent' : 'Mark as urgent'}</button>
+                  </div>
+                )}
+
+                <form onSubmit={(event) => { event.preventDefault(); sendMessage(); }} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <button type="button" style={{ width: 68, height: 64, borderRadius: 18, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.56)' }}><Paperclip size={24} style={{ margin: '0 auto' }} /></button>
+                  <input value={message} onChange={onChangeMessage} placeholder={`Type a message to ${selectedConversation.counterpart.name.split(' ')[0]}...`} style={{ flex: 1, height: 64, borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.02)', color: 'white', fontSize: 18, padding: '0 24px', outline: 'none' }} />
+                  <button type="submit" disabled={sending || !message.trim()} style={{ width: 64, height: 64, borderRadius: '50%', border: 'none', background: ACCENT, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Send size={24} /></button>
+                </form>
+              </div>
+            </>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.56)', fontSize: 18 }}>Select a conversation to start chatting.</div>
+          )}
+        </section>
+      </div>
+      </div>
+
+      {showProfile && selectedConversation && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ width: 'min(520px, 100%)', borderRadius: 32, background: 'linear-gradient(180deg, #0d1117, #080b0f)', border: '1px solid rgba(255,255,255,0.1)', padding: '40px 32px', boxShadow: '0 32px 64px rgba(0,0,0,0.6)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', inset: '0 0 auto 0', height: 160, background: 'radial-gradient(circle at top left, rgba(24,182,162,0.15), transparent 70%)', pointerEvents: 'none' }} />
+            
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                <div style={{ width: 84, height: 84, borderRadius: '50%', background: otherTone.bg, color: otherTone.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 800, border: '4px solid rgba(255,255,255,0.05)' }}>{initials(selectedConversation.counterpart.name)}</div>
+                <div>
+                  <h3 style={{ margin: 0, color: 'white', fontSize: 28, fontWeight: 900, letterSpacing: '-0.5px' }}>{selectedConversation.counterpart.name}</h3>
+                  <p style={{ margin: '8px 0 0', color: ACCENT, fontSize: 17, fontWeight: 700 }}>{viewerRole === 'doctor' ? `Patient #${selectedConversation.counterpart.referenceCode || '13496'}` : `${selectedConversation.counterpart.specialization || 'Doctor'}`}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowProfile(false)} className="close-btn" style={{ width: 48, height: 48, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.06)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={22} /></button>
+            </div>
+
+            <div style={{ display: 'grid', gap: 18, marginTop: 40, position: 'relative', zIndex: 1 }}>
+              <div style={{ padding: '20px 24px', borderRadius: 20, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}><div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Primary Email</div><div style={{ color: 'white', fontSize: 18, fontWeight: 600 }}>{selectedConversation.counterpart.email || 'Not provided'}</div></div>
+              <div style={{ padding: '20px 24px', borderRadius: 20, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}><div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Contact Number</div><div style={{ color: 'white', fontSize: 18, fontWeight: 600 }}>{selectedConversation.counterpart.phone || 'Not provided'}</div></div>
+              <div style={{ padding: '20px 24px', borderRadius: 20, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}><div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Appointment Status</div><div style={{ color: 'white', fontSize: 18, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: ACCENT }} />{selectedConversation.latestAppointmentStatus || 'Not available'}</div></div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

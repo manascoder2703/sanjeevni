@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Stethoscope, Video, Shield, ArrowRight, Star, Users, Clock, Quote, Sparkles, ShieldCheck } from 'lucide-react';
+import { Stethoscope, Video, Shield, ArrowRight, Star, Users, Clock, Quote, Sparkles, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // React Bits Components
 import DarkVeil from '@/components/react-bits/DarkVeil';
@@ -14,10 +14,172 @@ import CardSwap, { Card as SwapCard } from '@/components/react-bits/CardSwap';
 import BlurText from '@/components/react-bits/BlurText';
 import DecryptedText from '@/components/react-bits/DecryptedText';
 import SplitText from '@/components/react-bits/SplitText';
-import InfiniteMarquee from '@/components/react-bits/InfiniteMarquee';
 import GradualBlur from '@/components/react-bits/GradualBlur';
 import GradientText from '@/components/react-bits/GradientText';
 import GlassSurface from '@/components/react-bits/GlassSurface';
+import LandingAssistantWidget from '@/components/LandingAssistantWidget';
+
+function TestimonialCarousel({ title, subtitle, testimonials, gradientColors, accentColor, sectionStyle, roleFallback }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [direction, setDirection] = useState('right');
+  const activeTestimonial = testimonials[activeIndex];
+
+  const goPrevious = () => {
+    setDirection('left');
+    setActiveIndex((current) => (current - 1 + testimonials.length) % testimonials.length);
+  };
+
+  const goNext = () => {
+    setDirection('right');
+    setActiveIndex((current) => (current + 1) % testimonials.length);
+  };
+
+  return (
+    <section style={sectionStyle}>
+      <div style={{ textAlign: 'center', marginBottom: 44, padding: '0 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+          <GradientText
+            colors={gradientColors}
+            animationSpeed={6}
+            showBorder={false}
+            className="mx-auto"
+          >
+            <h2 style={{ fontSize: 36, fontWeight: 800, textAlign: 'center' }}>{title}</h2>
+          </GradientText>
+        </div>
+        <p style={{ color: 'var(--text-muted)', fontSize: 18, marginTop: 12 }}>{subtitle}</p>
+      </div>
+
+      <div style={{ maxWidth: 1320, margin: '0 auto', padding: '0 20px', position: 'relative' }}>
+        <div
+          style={{
+            position: 'absolute',
+            inset: '10% auto auto 16%',
+            width: 220,
+            height: 220,
+            borderRadius: '50%',
+            background: `${accentColor}14`,
+            filter: 'blur(88px)',
+            pointerEvents: 'none'
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 'auto 12% 6% auto',
+            width: 240,
+            height: 240,
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.05)',
+            filter: 'blur(92px)',
+            pointerEvents: 'none'
+          }}
+        />
+        <button
+          type="button"
+          onClick={goPrevious}
+          aria-label={`Previous ${title}`}
+          className="testimonial-nav-button"
+          style={{ left: 20 }}
+        >
+          <ChevronLeft size={24} />
+        </button>
+
+        <button
+          type="button"
+          onClick={goNext}
+          aria-label={`Next ${title}`}
+          className="testimonial-nav-button"
+          style={{ right: 20 }}
+        >
+          <ChevronRight size={24} />
+        </button>
+
+        <div className="testimonial-slider-shell">
+          <div
+            key={`${title}-${activeIndex}-${direction}`}
+            className={direction === 'right' ? 'testimonial-slide-right' : 'testimonial-slide-left'}
+            style={{
+              textAlign: 'center',
+              width: '100%',
+              position: 'relative',
+              padding: '16px 0 18px'
+            }}
+          >
+            <div
+              style={{
+                position: 'relative',
+                zIndex: 1,
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                margin: '0 auto 22px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: `${accentColor}1a`,
+                border: `1px solid ${accentColor}4d`,
+                color: accentColor,
+                fontWeight: 800,
+                fontSize: 20,
+                letterSpacing: '-0.03em'
+              }}
+            >
+              {activeTestimonial.name.charAt(0)}
+            </div>
+
+            <Quote size={40} style={{ position: 'relative', zIndex: 1, color: accentColor, opacity: 0.5, marginBottom: 22 }} />
+
+            <p
+              style={{
+                position: 'relative',
+                zIndex: 1,
+                fontSize: 'clamp(20px, 2.1vw, 28px)',
+                lineHeight: 1.85,
+                color: 'rgba(255,255,255,0.88)',
+                maxWidth: 860,
+                margin: '0 auto 28px',
+                textAlign: 'center'
+              }}
+            >
+              "{activeTestimonial.quote}"
+            </p>
+
+            <h4 style={{ position: 'relative', zIndex: 1, fontWeight: 800, fontSize: 24, color: 'white', textAlign: 'center', marginBottom: 8 }}>
+              {activeTestimonial.name}
+            </h4>
+            <p style={{ position: 'relative', zIndex: 1, color: accentColor, fontSize: 13, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', textAlign: 'center' }}>
+              {activeTestimonial.role || roleFallback}
+            </p>
+
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'center', gap: 10, marginTop: 24 }}>
+              {testimonials.map((testimonial, index) => (
+                <button
+                  key={`${testimonial.name}-${index}`}
+                  type="button"
+                  aria-label={`Show testimonial ${index + 1}`}
+                  onClick={() => {
+                    setDirection(index > activeIndex ? 'right' : 'left');
+                    setActiveIndex(index);
+                  }}
+                  style={{
+                    width: index === activeIndex ? 28 : 8,
+                    height: 8,
+                    borderRadius: 999,
+                    border: 'none',
+                    background: index === activeIndex ? accentColor : 'rgba(255,255,255,0.18)',
+                    transition: 'all 0.25s ease',
+                    cursor: 'pointer'
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -26,6 +188,9 @@ export default function HomePage() {
   const [onlineCount, setOnlineCount] = useState(null);
   const [titleComplete, setTitleComplete] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [founderImageMissing, setFounderImageMissing] = useState(false);
+
+  const founderVision = "Sanjeevni was born from a simple idea: that quality healthcare should be accessible to everyone, regardless of where they live. We combine cutting-edge technology with the expertise of top medical professionals to provide a seamless, secure, and compassionate care experience.";
 
   useEffect(() => {
     // We allow users to see the landing page even if logged in.
@@ -85,31 +250,55 @@ export default function HomePage() {
           opacity: 0.9;
           transform: scale(1.02);
         }
-        .testimonial-card {
-          padding: 32px;
-          min-width: 380px;
-          max-width: 380px;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          background: rgba(255, 255, 255, 0.03) !important;
-          backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.08) !important;
-          border-radius: 24px !important;
-          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-          white-space: normal;
-        }
-        .testimonial-card:hover {
-          border-color: rgba(14, 165, 233, 0.4) !important;
-          background: rgba(255, 255, 255, 0.05) !important;
-          transform: translateY(-8px) scale(1.02);
-          box-shadow: 0 20px 40px rgba(0,0,0,0.3), 0 0 20px rgba(14, 165, 233, 0.1);
-        }
         @keyframes pulse-glow {
           0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16,185,129,0.7); }
           70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16,185,129,0); }
           100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+        }
+        @keyframes testimonial-slide-right {
+          0% { opacity: 0; transform: translateX(36px); }
+          100% { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes testimonial-slide-left {
+          0% { opacity: 0; transform: translateX(-36px); }
+          100% { opacity: 1; transform: translateX(0); }
+        }
+        .testimonial-slide-right {
+          animation: testimonial-slide-right 0.35s ease;
+        }
+        .testimonial-slide-left {
+          animation: testimonial-slide-left 0.35s ease;
+        }
+        .testimonial-nav-button {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 52px;
+          height: 52px;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,0.1);
+          background: rgba(255,255,255,0.04);
+          backdrop-filter: blur(12px);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.25s ease;
+          z-index: 2;
+        }
+        .testimonial-nav-button:hover {
+          background: rgba(255,255,255,0.1);
+          border-color: rgba(255,255,255,0.22);
+        }
+        .testimonial-slider-shell {
+          max-width: 980px;
+          margin: 0 auto;
+          min-height: 340px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 88px;
         }
         .hero-btn-glass:hover {
           background: rgba(14, 165, 233, 0.2) !important;
@@ -126,6 +315,16 @@ export default function HomePage() {
         }
         .hide-scrollbar::-webkit-scrollbar {
           display: none;
+        }
+        @media (max-width: 768px) {
+          .testimonial-nav-button {
+            width: 44px;
+            height: 44px;
+          }
+          .testimonial-slider-shell {
+            min-height: 320px;
+            padding: 0 52px;
+          }
         }
       `}</style>
       
@@ -287,83 +486,307 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Doctor Testimonials */}
-      <section style={{ background: 'rgba(14,165,233,0.02)', padding: '120px 0' }}>
-        <div style={{ textAlign: 'center', marginBottom: 60, padding: '0 32px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-            <GradientText
-              colors={["#0ea5e9", "#818cf8", "#c084fc", "#0ea5e9"]}
-              animationSpeed={6}
-              showBorder={false}
-              className="mx-auto"
-            >
-              <h2 style={{ fontSize: 36, fontWeight: 800, textAlign: 'center' }}>Trusted by Professionals</h2>
-            </GradientText>
+      <TestimonialCarousel
+        title="Trusted by Professionals"
+        subtitle="Experience from our verified medical experts"
+        testimonials={doctorTestimonials}
+        gradientColors={["#0ea5e9", "#818cf8", "#c084fc", "#0ea5e9"]}
+        accentColor="#0ea5e9"
+        roleFallback="Verified Doctor"
+        sectionStyle={{
+          background: 'linear-gradient(180deg, rgba(14,165,233,0.03) 0%, rgba(99,102,241,0.025) 58%, rgba(255,255,255,0) 100%)',
+          padding: '110px 0 56px',
+          position: 'relative'
+        }}
+      />
+
+      <section
+        style={{
+          padding: '30px 0 28px',
+          position: 'relative',
+          background: 'linear-gradient(180deg, rgba(14,165,233,0.02) 0%, rgba(34,211,238,0.03) 45%, rgba(255,255,255,0) 100%)'
+        }}
+      >
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px' }}>
+          <div style={{ position: 'relative', maxWidth: 860, display: 'grid', gap: 24 }}>
+            <div
+              style={{
+                position: 'absolute',
+                inset: '-2% auto auto -10%',
+                width: 220,
+                height: 220,
+                borderRadius: '50%',
+                background: 'rgba(14,165,233,0.1)',
+                filter: 'blur(92px)',
+                pointerEvents: 'none'
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                inset: 'auto -8% -10% auto',
+                width: 240,
+                height: 240,
+                borderRadius: '50%',
+                background: 'rgba(129,140,248,0.08)',
+                filter: 'blur(104px)',
+                pointerEvents: 'none'
+              }}
+            />
+            <div style={{ textAlign: 'left' }}>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 14px',
+                  borderRadius: 999,
+                  background: 'rgba(255,255,255,0.04)',
+                  marginBottom: 18
+                }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22d3ee', boxShadow: '0 0 16px rgba(34,211,238,0.8)' }} />
+                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.72)' }}>
+                  Meet The Founder
+                </span>
+              </div>
+
+              <h2 style={{ fontSize: 'clamp(34px, 4.2vw, 56px)', fontWeight: 900, color: 'white', lineHeight: 1.05, marginBottom: 14 }}>
+                Manas Mishra
+              </h2>
+
+              <p style={{ fontSize: 14, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(34,211,238,0.8)', marginBottom: 22 }}>
+                Founder, Sanjeevni
+              </p>
+
+              <p style={{ color: '#a1a1aa', fontSize: 18, lineHeight: 1.8, marginBottom: 24, maxWidth: 640 }}>
+                Sanjeevni is being shaped to make quality healthcare feel more reachable, more organized, and more human for patients and doctors alike.
+              </p>
+
+              <div style={{ display: 'grid', gap: 14 }}>
+                <div style={{ padding: '18px 20px', borderRadius: 22, background: 'rgba(255,255,255,0.03)' }}>
+                  <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(34,211,238,0.82)', marginBottom: 8 }}>
+                    What Drives Sanjeevni
+                  </p>
+                  <p style={{ color: 'white', fontSize: 15, lineHeight: 1.7, margin: 0 }}>
+                    Expanding healthcare access without losing the trust, empathy, and clarity people expect from care.
+                  </p>
+                </div>
+                <div style={{ padding: '18px 20px', borderRadius: 22, background: 'rgba(255,255,255,0.03)' }}>
+                  <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.88)', marginBottom: 8 }}>
+                    The Goal
+                  </p>
+                  <p style={{ color: 'white', fontSize: 15, lineHeight: 1.7, margin: 0 }}>
+                    Building one seamless place where patients save time finding care and doctors spend more time on care itself.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: 18, marginTop: 12 }}>Experience from our verified medical experts</p>
         </div>
-        
-        <InfiniteMarquee speed={0.8} direction="left">
-          {doctorTestimonials.map((t, i) => (
-            <div key={i} className="testimonial-card" style={{ padding: 0 }}>
-              <GlassSurface borderRadius={24} backgroundOpacity={0.05} saturation={1.2} distortionScale={-200} displace={1.5}>
-                <div style={{ padding: 32, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div>
-                    <Quote size={32} style={{ color: 'var(--accent)', opacity: 0.4, marginBottom: 20 }} />
-                    <p style={{ fontSize: 17, lineHeight: 1.7, color: 'rgba(255,255,255,0.8)', fontStyle: 'italic', marginBottom: 24 }}>"{t.quote}"</p>
-                  </div>
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg,#0ea5e9,#818cf8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: 'white' }}>{t.name[4]}</div>
+      </section>
+
+      {/* Founder's Vision */}
+      <section
+        id="about-section"
+        style={{
+          padding: '42px 0 0',
+          position: 'relative',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.015) 0%, rgba(34,211,238,0.03) 40%, rgba(255,255,255,0) 100%)'
+        }}
+      >
+        <div style={{ width: '100%', padding: '0 20px' }}>
+          <div className="w-full relative overflow-hidden">
+            <div
+              style={{
+                position: 'absolute',
+                inset: '4% auto auto -8%',
+                width: 260,
+                height: 260,
+                borderRadius: '50%',
+                background: 'rgba(34,211,238,0.12)',
+                filter: 'blur(100px)',
+                pointerEvents: 'none'
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                inset: 'auto -6% 8% auto',
+                width: 280,
+                height: 280,
+                borderRadius: '50%',
+                background: 'rgba(129,140,248,0.1)',
+                filter: 'blur(110px)',
+                pointerEvents: 'none'
+              }}
+            />
+            <div className="p-8 md:p-12 lg:p-16 grid grid-cols-1 md:grid-cols-[1.2fr_0.8fr] gap-12 md:gap-20 items-center">
+              <div className="text-left">
+                <GradientText
+                  colors={["#22d3ee", "#818cf8", "#c084fc", "#22d3ee"]}
+                  animationSpeed={6}
+                  showBorder={false}
+                  className="text-sm font-bold tracking-widest mb-4"
+                >
+                  Founder's Vision
+                </GradientText>
+                
+                <h2 style={{ fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 900, color: 'white', lineHeight: 1.1, marginBottom: 24 }}>
+                  A healthcare experience built around access, trust, and compassionate technology.
+                </h2>
+                
+                <p style={{ color: '#94a3b8', fontSize: 'clamp(16px, 1.2vw, 19px)', lineHeight: 1.6, marginBottom: 32, maxWidth: 600 }}>
+                  {founderVision}
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="flex items-start gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all hover:translate-y-[-2px] duration-300">
+                    <div className="p-3 bg-blue-500/10 rounded-xl">
+                      <ShieldCheck size={24} className="text-blue-400" />
+                    </div>
                     <div>
-                      <h4 style={{ fontWeight: 700, fontSize: 16, color: 'white' }}>{t.name}</h4>
-                      <p style={{ color: 'var(--accent)', fontSize: 13, fontWeight: 600 }}>{t.role}</p>
+                      <h4 className="font-bold text-white mb-1">Access For Everyone</h4>
+                      <p className="text-sm text-zinc-400">Patients should be able to reach quality healthcare no matter where they live.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all hover:translate-y-[-2px] duration-300">
+                    <div className="p-3 bg-purple-500/10 rounded-xl">
+                      <Users size={24} className="text-purple-400" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-white mb-1">Technology With Compassion</h4>
+                      <p className="text-sm text-zinc-400">Modern tools should support doctors with efficiency while keeping care secure and personal.</p>
                     </div>
                   </div>
                 </div>
-              </GlassSurface>
-            </div>
-          ))}
-        </InfiniteMarquee>
-      </section>
+              </div>
 
-      {/* Patient Testimonials */}
-      <section style={{ padding: '80px 0' }}>
-        <div style={{ textAlign: 'center', marginBottom: 40, padding: '0 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-            <GradientText
-              colors={["#22d3ee", "#818cf8", "#c084fc", "#22d3ee"]}
-              animationSpeed={6}
-              showBorder={false}
-              className="mx-auto"
-            >
-              <h2 style={{ fontSize: 36, fontWeight: 800, textAlign: 'center' }}>Patient Success Stories</h2>
-            </GradientText>
-          </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: 18, marginTop: 12 }}>Real stories from people who chose Sanjeevni</p>
-        </div>
-
-        <InfiniteMarquee speed={0.6} direction="left">
-          {patientTestimonials.map((t, i) => (
-            <div key={i} className="testimonial-card" style={{ padding: 0 }}>
-              <GlassSurface borderRadius={24} backgroundOpacity={0.05} saturation={1.2} distortionScale={-200} displace={1.5}>
-                <div style={{ padding: 32, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                  <div>
-                    <Quote size={32} style={{ color: '#06b6d4', opacity: 0.4, marginBottom: 20 }} />
-                    <p style={{ fontSize: 17, lineHeight: 1.7, color: 'rgba(255,255,255,0.8)', marginBottom: 24 }}>"{t.quote}"</p>
-                  </div>
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#06b6d4' }}>{t.name[0]}</div>
-                    <div>
-                      <h4 style={{ fontWeight: 700, fontSize: 16, color: 'white' }}>{t.name}</h4>
-                      <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Happy Patient</p>
-                    </div>
+              <div className="relative">
+                <div className="w-full max-w-[500px] lg:max-w-[560px] mx-auto relative">
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: '30px auto auto 10%',
+                      width: 220,
+                      height: 220,
+                      borderRadius: '50%',
+                      background: 'rgba(34,211,238,0.16)',
+                      filter: 'blur(80px)',
+                      pointerEvents: 'none'
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'relative',
+                      borderRadius: 34,
+                      overflow: 'hidden',
+                      minHeight: 560,
+                      background: 'linear-gradient(180deg, rgba(11,15,25,0.96), rgba(7,10,18,0.98))',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      boxShadow: '0 24px 80px rgba(0,0,0,0.42)'
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: '-10% auto auto -8%',
+                        width: 220,
+                        height: 220,
+                        borderRadius: '50%',
+                        background: 'rgba(34,211,238,0.14)',
+                        filter: 'blur(72px)',
+                        pointerEvents: 'none',
+                        zIndex: 1
+                      }}
+                    />
+                    {!founderImageMissing ? (
+                      <>
+                        <img
+                          src="/founder-manas-mishra.jpg.png"
+                          alt="Manas Mishra"
+                          onError={() => setFounderImageMissing(true)}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'center 14%',
+                            minHeight: 560,
+                            filter: 'brightness(0.94) saturate(0.92) contrast(1.04)'
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: 'linear-gradient(180deg, rgba(5,8,15,0.14) 0%, rgba(5,8,15,0.04) 30%, rgba(5,8,15,0.22) 62%, rgba(5,8,15,0.72) 100%), linear-gradient(90deg, rgba(5,8,15,0.38) 0%, rgba(5,8,15,0.08) 28%, rgba(5,8,15,0) 52%, rgba(5,8,15,0.18) 100%)',
+                            pointerEvents: 'none',
+                            zIndex: 2
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 'auto 0 0 0',
+                            height: 120,
+                            background: 'linear-gradient(180deg, rgba(5,8,15,0), rgba(5,8,15,0.86))',
+                            pointerEvents: 'none',
+                            zIndex: 2
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <div
+                        style={{
+                          width: '100%',
+                          minHeight: 560,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'linear-gradient(135deg, rgba(34,211,238,0.16), rgba(129,140,248,0.12))'
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 150,
+                            height: 150,
+                            borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.08)',
+                            border: '1px solid rgba(255,255,255,0.14)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontSize: 48,
+                            fontWeight: 900,
+                            letterSpacing: '-0.04em'
+                          }}
+                        >
+                          MM
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </GlassSurface>
+              </div>
             </div>
-          ))}
-        </InfiniteMarquee>
+          </div>
+        </div>
       </section>
+
+      <TestimonialCarousel
+        title="Patient Success Stories"
+        subtitle="Real stories from people who chose Sanjeevni"
+        testimonials={patientTestimonials}
+        gradientColors={["#22d3ee", "#818cf8", "#c084fc", "#22d3ee"]}
+        accentColor="#22d3ee"
+        roleFallback="Happy Patient"
+        sectionStyle={{
+          padding: '40px 0 96px',
+          position: 'relative',
+          background: 'linear-gradient(180deg, rgba(34,211,238,0.02) 0%, rgba(129,140,248,0.02) 55%, rgba(255,255,255,0) 100%)'
+        }}
+      />
 
       {/* Specialties */}
       <section style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px 60px', textAlign: 'center' }}>
@@ -389,73 +812,145 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* About Us Section */}
-      <section id="about-section" style={{ padding: '100px 0 60px' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 20px' }}>
-          <div className="w-full relative overflow-hidden">
-            <div className="p-8 md:p-12 lg:p-16 grid grid-cols-1 md:grid-cols-[1.2fr_0.8fr] gap-12 md:gap-20 items-center">
-              <div className="text-left">
-                <GradientText
-                  colors={["#22d3ee", "#818cf8", "#c084fc", "#22d3ee"]}
-                  animationSpeed={6}
-                  showBorder={false}
-                  className="text-sm font-bold tracking-widest mb-4"
-                >
-                  Our Mission
-                </GradientText>
-                
-                <h2 style={{ fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 900, color: 'white', lineHeight: 1.1, marginBottom: 24 }}>
-                  Revolutionizing Healthcare <br/>
-                  <span style={{ color: '#94a3b8', fontWeight: 700 }}>With Human-Centric AI.</span>
-                </h2>
-                
-                <p style={{ color: '#94a3b8', fontSize: 'clamp(16px, 1.2vw, 19px)', lineHeight: 1.6, marginBottom: 32, maxWidth: 600 }}>
-                  Sanjeevni was born from a simple idea: that quality healthcare should be accessible to everyone, regardless of where they live. We combine cutting-edge technology with the expertise of top medical professionals to provide a seamless, secure, and compassionate care experience.
-                </p>
+      <section style={{ padding: '30px 0 90px', position: 'relative' }}>
+        <div style={{ width: '100%', padding: '0 20px' }}>
+          <div
+            style={{
+              width: '100%',
+              height: 1,
+              marginBottom: 36,
+              background: 'linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.16), rgba(34,211,238,0.4), rgba(255,255,255,0.16), rgba(255,255,255,0))'
+            }}
+          />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="flex items-start gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all hover:translate-y-[-2px] duration-300">
-                    <div className="p-3 bg-blue-500/10 rounded-xl">
-                      <ShieldCheck size={24} className="text-blue-400" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-white mb-1">Secure & Private</h4>
-                      <p className="text-sm text-zinc-400">HIPAA-compliant video calls and encrypted data.</p>
-                    </div>
+          <div
+            style={{
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                inset: 'auto auto -80px -40px',
+                width: 220,
+                height: 220,
+                borderRadius: '50%',
+                background: 'rgba(34,211,238,0.12)',
+                filter: 'blur(70px)',
+                pointerEvents: 'none'
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: -50,
+                right: -30,
+                width: 220,
+                height: 220,
+                borderRadius: '50%',
+                background: 'rgba(129,140,248,0.1)',
+                filter: 'blur(85px)',
+                pointerEvents: 'none'
+              }}
+            />
+
+            <div
+              style={{
+                position: 'relative',
+                padding: '20px 10px 10px',
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 0.85fr)',
+                gap: 30,
+                alignItems: 'stretch'
+              }}
+              className="about-bottom-grid"
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 22 }}>
+                <div>
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '8px 14px',
+                      borderRadius: 999,
+                      background: 'rgba(255,255,255,0.03)',
+                      marginBottom: 18
+                    }}
+                  >
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22d3ee', boxShadow: '0 0 16px rgba(34,211,238,0.8)' }} />
+                    <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.72)' }}>
+                      About Us
+                    </span>
                   </div>
-                  <div className="flex items-start gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:border-white/10 transition-all hover:translate-y-[-2px] duration-300">
-                    <div className="p-3 bg-purple-500/10 rounded-xl">
-                      <Users size={24} className="text-purple-400" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-white mb-1">Human-First</h4>
-                      <p className="text-sm text-zinc-400">Technology that empowers, not replaces, doctors.</p>
-                    </div>
+
+                  <h3 style={{ fontSize: 'clamp(28px, 3.2vw, 40px)', fontWeight: 900, color: 'white', lineHeight: 1.08, marginBottom: 16, maxWidth: 720 }}>
+                    Sanjeevni is built to make digital healthcare feel faster, simpler, and more human.
+                  </h3>
+
+                  <p style={{ color: '#a1a1aa', fontSize: 16, lineHeight: 1.8, maxWidth: 720, margin: 0 }}>
+                    We designed Sanjeevni for people who want healthcare access without unnecessary friction. Patients can discover doctors, book appointments, and connect through secure video consultations, while doctors can manage requests, consultations, and daily workflows from one streamlined platform.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                  <div style={{ padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'white', fontSize: 13, fontWeight: 700 }}>
+                    Telemedicine
+                  </div>
+                  <div style={{ padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'white', fontSize: 13, fontWeight: 700 }}>
+                    Secure Video Consults
+                  </div>
+                  <div style={{ padding: '10px 14px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'white', fontSize: 13, fontWeight: 700 }}>
+                    Doctor & Patient Workflows
                   </div>
                 </div>
               </div>
 
-              <div className="relative">
-                <div className="w-full aspect-square max-w-[500px] lg:max-w-[540px] mx-auto relative group">
-                   {/* Background Glow */}
-                   <div className="absolute inset-0 bg-blue-500/25 blur-[120px] rounded-full animate-pulse group-hover:bg-blue-500/35 transition-colors duration-500" />
-                   
-                   <GlassSurface 
-                     borderRadius={999} 
-                     backgroundOpacity={0.12} 
-                     className="w-full h-full border border-white/10 flex items-center justify-center p-10 md:p-16 transition-transform duration-500 group-hover:scale-[1.03]"
-                   >
-                     <div className="text-center">
-                        <div className="relative mb-8">
-                          <Stethoscope size={96} className="text-blue-400 mx-auto drop-shadow-[0_0_20px_rgba(59,130,246,0.6)] animate-bounce-slow" />
-                          <div className="absolute -top-3 -right-3 p-3 bg-blue-500/25 rounded-full backdrop-blur-md border border-white/10">
-                            <Sparkles size={20} className="text-blue-300" />
-                          </div>
-                        </div>
-                        <div className="text-5xl md:text-6xl font-black text-white mb-3 tracking-tighter">10k+</div>
-                        <div className="text-zinc-400/60 font-bold tracking-widest text-sm md:text-base">Global Patients</div>
-                     </div>
-                   </GlassSurface>
+              <div style={{ display: 'grid', gap: 14 }}>
+                <div
+                  style={{
+                    padding: '20px 20px 18px',
+                    borderRadius: 22,
+                    background: 'rgba(255,255,255,0.03)'
+                  }}
+                >
+                  <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(34,211,238,0.78)', marginBottom: 8 }}>
+                    For Patients
+                  </p>
+                  <p style={{ color: 'white', fontSize: 15, lineHeight: 1.7, margin: 0 }}>
+                    Get faster access to specialists, simpler online booking, and consultations from wherever you are.
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    padding: '20px 20px 18px',
+                    borderRadius: 22,
+                    background: 'rgba(255,255,255,0.03)'
+                  }}
+                >
+                  <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(129,140,248,0.88)', marginBottom: 8 }}>
+                    For Doctors
+                  </p>
+                  <p style={{ color: 'white', fontSize: 15, lineHeight: 1.7, margin: 0 }}>
+                    Reduce scheduling friction, manage appointments in one place, and use your time more efficiently through digital consultations.
+                  </p>
+                </div>
+
+                <div
+                  style={{
+                    padding: '20px 20px 18px',
+                    borderRadius: 22,
+                    background: 'linear-gradient(135deg, rgba(34,211,238,0.07), rgba(129,140,248,0.07))'
+                  }}
+                >
+                  <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.52)', marginBottom: 8 }}>
+                    Why Sanjeevni
+                  </p>
+                  <p style={{ color: 'white', fontSize: 15, lineHeight: 1.7, margin: 0 }}>
+                    A modern healthcare experience that combines convenience, trust, and productivity for both sides of the consultation.
+                  </p>
                 </div>
               </div>
             </div>
@@ -463,8 +958,90 @@ export default function HomePage() {
         </div>
       </section>
 
+      <style>{`
+        @media (max-width: 860px) {
+          .about-bottom-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
+
+      <section style={{ padding: '0 20px 44px', position: 'relative', zIndex: 1 }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <div
+            style={{
+              width: 88,
+              height: 88,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle at 30% 30%, rgba(34,211,238,0.22), rgba(255,255,255,0.04))',
+              border: '1px solid rgba(255,255,255,0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 70px rgba(34,211,238,0.22), inset 0 1px 0 rgba(255,255,255,0.08)'
+            }}
+          >
+            <Stethoscope size={38} style={{ color: '#22d3ee' }} />
+          </div>
+
+          <div style={{ fontSize: 'clamp(30px, 4vw, 42px)', fontWeight: 900, letterSpacing: '-0.05em', color: 'white', lineHeight: 1 }}>
+            Sanjeevni
+          </div>
+
+          <div
+            style={{
+              width: 'min(480px, 90vw)',
+              height: 1,
+              background: 'linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.18), rgba(34,211,238,0.35), rgba(255,255,255,0.18), rgba(255,255,255,0))'
+            }}
+          />
+
+          <p style={{ margin: 0, color: 'rgba(255,255,255,0.52)', fontSize: 13, letterSpacing: '0.04em', lineHeight: 1.6, textAlign: 'center' }}>
+            Copyright reserved, Sanjeevni. All rights reserved.
+          </p>
+        </div>
+      </section>
+
+      <LandingAssistantWidget />
+
       {/* Footer */}
-      <footer style={{ padding: '24px 32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+      <footer style={{ display: 'none' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+            <div
+              style={{
+                width: 76,
+                height: 76,
+                borderRadius: '50%',
+                background: 'radial-gradient(circle at 30% 30%, rgba(34,211,238,0.22), rgba(255,255,255,0.04))',
+                border: '1px solid rgba(255,255,255,0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 60px rgba(34,211,238,0.18), inset 0 1px 0 rgba(255,255,255,0.08)'
+              }}
+            >
+              <Stethoscope size={34} style={{ color: '#22d3ee' }} />
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 'clamp(28px, 4vw, 38px)', fontWeight: 900, letterSpacing: '-0.05em', color: 'white', lineHeight: 1 }}>
+                Sanjeevni
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              width: 'min(460px, 90vw)',
+              height: 1,
+              background: 'linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.18), rgba(34,211,238,0.35), rgba(255,255,255,0.18), rgba(255,255,255,0))'
+            }}
+          />
+
+          <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: 13, letterSpacing: '0.04em', lineHeight: 1.6 }}>
+            Copyright reserved, Sanjeevni. All rights reserved.
+          </p>
+        </div>
         © 2024 Sanjeevni. Built for better healthcare access.
       </footer>
     </div>

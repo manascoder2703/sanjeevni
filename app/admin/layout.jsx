@@ -79,7 +79,7 @@ export default function DashboardLayout({ children }) {
                 <BreadcrumbList>
                   <BreadcrumbItem className="hidden md:block">
                     <BreadcrumbPage className="text-white font-medium">
-                      Sanjeevani
+                      Sanjeevni
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                   {breadcrumbs.slice(1).map((bc, i) => (

@@ -28,6 +28,10 @@ export default function DashboardLayout({ children }) {
   const router = useRouter()
   const pathname = usePathname()
   const [isReady, setIsReady] = useState(false)
+  const isChatPage =
+    pathname === "/dashboard/doctor/chat" ||
+    pathname === "/dashboard/patient/chat" ||
+    pathname === "/dashboard/patient/ai-assistant"
 
   useEffect(() => {
     if (!loading) {
@@ -87,7 +91,7 @@ export default function DashboardLayout({ children }) {
                 <BreadcrumbList>
                   <BreadcrumbItem className="hidden md:block">
                     <BreadcrumbPage className="text-white font-medium">
-                      Sanjeevani
+                      Sanjeevni
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                   {breadcrumbs.slice(1).map((bc, i) => (
@@ -114,8 +118,13 @@ export default function DashboardLayout({ children }) {
           </header>
 
           <div 
-            className="flex-1 overflow-y-auto relative z-10 custom-scrollbar py-8 flex flex-col items-center"
-            style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
+            className={`flex-1 relative z-10 custom-scrollbar flex flex-col min-h-0 ${isChatPage ? "items-stretch overflow-hidden" : "items-center overflow-y-auto"}`}
+            style={{
+              paddingLeft: isChatPage ? '0' : '2.5rem',
+              paddingRight: isChatPage ? '0' : '2.5rem',
+              paddingTop: isChatPage ? '0' : '2rem',
+              paddingBottom: isChatPage ? '0' : '2rem',
+            }}
           >
             {children}
           </div>

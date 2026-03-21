@@ -2,231 +2,479 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { 
-  Users, 
-  Stethoscope, 
-  Calendar, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  ShieldCheck, 
-  TrendingUp,
-  Activity,
-  UserPlus,
-  ArrowUpRight
+import {
+  Users, Stethoscope, Calendar, Clock,
+  CheckCircle, XCircle, AlertCircle, Star,
+  ChevronUp, ChevronDown, Save, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
-// Mock data for platform growth
-const growthData = [
-  { name: 'Week 1', users: 400, doctors: 240 },
-  { name: 'Week 2', users: 600, doctors: 320 },
-  { name: 'Week 3', users: 800, doctors: 450 },
-  { name: 'Week 4', users: 1100, doctors: 580 },
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getInitials(name = '') {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+const AVATAR_COLORS = [
+  { bg: 'rgba(59,130,246,0.2)',  text: '#60a5fa' },
+  { bg: 'rgba(139,92,246,0.2)', text: '#a78bfa' },
+  { bg: 'rgba(34,197,94,0.2)',  text: '#4ade80' },
+  { bg: 'rgba(249,115,22,0.2)', text: '#fb923c' },
+  { bg: 'rgba(236,72,153,0.2)', text: '#f472b6' },
+  { bg: 'rgba(20,184,166,0.2)', text: '#2dd4bf' },
 ];
+function avatarColor(name = '') {
+  return AVATAR_COLORS[(name.charCodeAt(0) || 0) % AVATAR_COLORS.length];
+}
 
-export default function AdminDashboard() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
+function getStatusStyle(status) {
+  switch (status) {
+    case 'confirmed': return { label: 'Confirmed', color: '#60a5fa', bg: 'rgba(59,130,246,0.1)',  border: 'rgba(59,130,246,0.2)',  dot: '#60a5fa' };
+    case 'pending':   return { label: 'Pending',   color: '#fbbf24', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', dot: '#fbbf24' };
+    case 'completed': return { label: 'Completed', color: '#4ade80', bg: 'rgba(34,197,94,0.1)',  border: 'rgba(34,197,94,0.2)',  dot: '#4ade80' };
+    case 'cancelled': return { label: 'Cancelled', color: '#fb7185', bg: 'rgba(244,63,94,0.1)',  border: 'rgba(244,63,94,0.2)',  dot: '#fb7185' };
+    default:          return { label: status,      color: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)', dot: 'rgba(255,255,255,0.4)' };
+  }
+}
 
-  const fetchStats = useCallback(async () => {
+const card = { background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.07)', borderRadius: '20px' };
+
+function inp(extra = {}) {
+  return {
+    style: {
+      width: '100%', background: 'rgba(255,255,255,0.03)',
+      border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '10px',
+      padding: '10px 14px', fontSize: '13px', color: '#fff', outline: 'none',
+      boxSizing: 'border-box', transition: 'border-color 0.15s', ...extra,
+    },
+    onFocus: e => e.target.style.borderColor = 'rgba(59,130,246,0.5)',
+    onBlur:  e => e.target.style.borderColor = 'rgba(255,255,255,0.08)',
+  };
+}
+
+// ─── Edit Doctor Modal ─────────────────────────────────────────────────────────
+function EditDoctorModal({ doctor, onClose, onSave }) {
+  const [form, setForm] = useState({
+    specialization: doctor.specialization || '',
+    fee:            doctor.fee || '',
+    experience:     doctor.experience || '',
+    hospital:       doctor.hospital || '',
+    bio:            doctor.bio || '',
+    isApproved:     doctor.isApproved || false,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
     try {
-      const res = await fetch('/api/admin');
+      const res = await fetch('/api/admin', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doctorId: doctor._id, updates: { ...form, fee: Number(form.fee), experience: Number(form.experience) } }),
+      });
       const data = await res.json();
-      setStats(data);
-    } catch (error) {
-      toast.error('Failed to bridge platform stats');
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      toast.success('Doctor updated');
+      onSave();
+      onClose();
+    } catch (err) {
+      toast.error(err.message);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
-  }, []);
-
-  const handleApprove = async (doctorId, action) => {
-    await fetch('/api/admin', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ doctorId, action }),
-    });
-    toast.success(`Protocol ${action} finalized`);
-    fetchStats();
   };
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) { router.push('/login'); return; }
-    if (user.role !== 'admin') { router.push('/'); return; }
-    fetchStats();
-  }, [user, authLoading, router, fetchStats]);
-
-  if (!user || user.role !== 'admin') return null;
-
   return (
-    <div className="flex flex-col gap-10 w-full animate-fade-in pb-12">
-      {/* Platform Header */}
-      <div className="flex flex-col px-1 gap-2">
-        <div className="flex items-center gap-2">
-           <span className="px-3 py-1 bg-white/5 text-white/40 text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-white/10">
-              System Administrator
-           </span>
-        </div>
-        <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white mt-1">
-          Platform <span className="text-blue-500">Insights</span>
-        </h1>
-        <p className="text-white/20 text-xs font-bold uppercase tracking-[0.2em] mb-4">
-           Global system status & medical professional vetting
-        </p>
-      </div>
-
-      {/* Primary Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { label: 'Total Base', value: stats?.totalUsers || 0, color: 'blue', icon: <Users size={22} />, trend: '+12%' },
-          { label: 'Verified MDs', value: stats?.totalDoctors || 0, color: 'emerald', icon: <Stethoscope size={22} />, trend: '+5%' },
-          { label: 'Active Sessions', value: stats?.totalAppointments || 0, color: 'cyan', icon: <Calendar size={22} />, trend: '+18%' },
-          { label: 'Queue Load', value: stats?.pendingDoctors || 0, color: 'amber', icon: <Clock size={22} />, trend: 'Urgent' },
-        ].map((s, i) => (
-          <div key={i} className="glass-card group p-6 flex flex-col gap-5 hover:bg-white/[0.04] transition-all border border-white/5 cursor-default relative overflow-hidden">
-            <div className={`absolute top-0 left-0 w-1 h-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity`} />
-            <div className="flex items-center justify-between">
-              <div className={`p-3 rounded-2xl bg-blue-500/10 text-blue-400 group-hover:scale-110 transition-transform duration-500`}>
-                {s.icon}
-              </div>
-              <div className="flex flex-col items-end">
-                <span className="text-4xl font-black text-white tracking-tighter tabular-nums">{s.value}</span>
-                <span className="text-[10px] font-bold text-blue-400/60 uppercase tracking-widest">{s.trend}</span>
-              </div>
-            </div>
-            <p className="text-white/30 text-[10px] font-black uppercase tracking-[0.2em]">{s.label}</p>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '24px' }}>
+      <div style={{ background: '#0a0b0d', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '24px', padding: '32px', maxWidth: '520px', width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#fff', margin: 0 }}>Edit Doctor</h3>
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', margin: '3px 0 0' }}>Dr. {doctor.userId?.name}</p>
           </div>
-        ))}
-      </div>
-
-      {/* Growth Visualization */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 glass-card p-6 md:p-10 flex flex-col gap-8">
-           <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <h3 className="text-2xl font-black text-white tracking-tight">Expansion Curve</h3>
-                <p className="text-white/20 text-[10px] font-black uppercase tracking-widest">Network Growth Analysis</p>
-              </div>
-              <div className="flex gap-2">
-                 <div className="flex items-center gap-2 px-3 py-1 bg-blue-500/10 rounded-lg">
-                    <div className="size-1.5 bg-blue-500 rounded-full"></div>
-                    <span className="text-[10px] font-bold text-blue-400 uppercase">Users</span>
-                 </div>
-                 <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-lg">
-                    <div className="size-1.5 bg-emerald-500 rounded-full"></div>
-                    <span className="text-[10px] font-bold text-emerald-400 uppercase">Doctors</span>
-                 </div>
-              </div>
-           </div>
-           
-           <div className="h-[300px] w-full">
-             <ResponsiveContainer width="100%" height="100%">
-               <AreaChart data={growthData}>
-                 <defs>
-                   <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                   </linearGradient>
-                   <linearGradient id="colorDoctors" x1="0" y1="0" x2="0" y2="1">
-                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                     <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                   </linearGradient>
-                 </defs>
-                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
-                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#ffffff20', fontSize: 11 }} />
-                 <YAxis hide />
-                 <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderRadius: '16px', border: '1px solid #ffffff10', color: '#fff' }} />
-                 <Area type="monotone" dataKey="users" stroke="#3b82f6" strokeWidth={4} fillOpacity={1} fill="url(#colorUsers)" />
-                 <Area type="monotone" dataKey="doctors" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorDoctors)" />
-               </AreaChart>
-             </ResponsiveContainer>
-           </div>
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', color: 'rgba(255,255,255,0.4)' }}>
+            <X size={16} />
+          </button>
         </div>
 
-        <div className="lg:col-span-4 glass-card p-8 flex flex-col gap-6 items-center justify-center text-center relative overflow-hidden">
-           <div className="absolute inset-0 bg-blue-500/5 blur-[100px] -z-10 rounded-full"></div>
-           <div className="p-6 bg-blue-500/10 rounded-full text-blue-400">
-             <ShieldCheck size={48} />
-           </div>
-           <div className="flex flex-col gap-2">
-             <h4 className="text-xl font-black text-white">Security Protocol</h4>
-             <p className="text-white/40 text-sm max-w-[200px]">All medical credentials are verified against secondary datasets for maximum compliance.</p>
-           </div>
-           <button className="w-full py-4 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all hover:bg-blue-500 hover:text-white">
-             Audit Logs
-           </button>
-        </div>
-      </div>
-
-      {/* Credentials Verification Workspace */}
-      <div className="glass-card flex flex-col overflow-hidden min-h-[500px]">
-        <div className="flex items-center justify-between p-6 md:px-10 border-b border-white/5 bg-white/[0.02]">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-amber-500/10 rounded-2xl text-amber-500">
-              <ShieldCheck size={24} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          {[
+            { label: 'Specialization', key: 'specialization' },
+            { label: 'Hospital', key: 'hospital' },
+            { label: 'Fee (₹)', key: 'fee', type: 'number' },
+            { label: 'Experience (yrs)', key: 'experience', type: 'number' },
+          ].map(f => (
+            <div key={f.key}>
+              <label style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: '6px' }}>{f.label}</label>
+              <input {...inp()} type={f.type || 'text'} value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
             </div>
-            <div className="flex flex-col">
-              <h2 className="text-2xl font-black text-white tracking-tight">Credentials Vetting</h2>
-              <p className="text-white/20 text-[10px] font-black uppercase tracking-widest">Awaiting Identity Verification</p>
-            </div>
+          ))}
+          <div style={{ gridColumn: 'span 2' }}>
+            <label style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: '6px' }}>Bio</label>
+            <textarea {...inp({ resize: 'none', minHeight: '80px' })} value={form.bio} onChange={e => setForm(p => ({ ...p, bio: e.target.value }))} />
           </div>
-        </div>
-
-        <div className="p-6 md:p-10 flex-1 bg-black/10">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-32 gap-6">
-              <div className="size-16 border-2 border-blue-500/20 border-t-blue-500 animate-spin rounded-full" />
-            </div>
-          ) : !stats?.recentDoctors?.length ? (
-            <div className="flex flex-col items-center justify-center py-32 text-center opacity-20 gap-4">
-              <div className="p-6 bg-emerald-500/10 rounded-full text-emerald-500">
-                 <CheckCircle size={64} />
-              </div>
-              <p className="text-white text-xl font-black tracking-tight uppercase">Vetting Queue Empty</p>
-            </div>
-          ) : (
-            <div className="grid gap-6">
-              {stats.recentDoctors.map(doc => (
-                <div key={doc._id} className="group relative flex flex-col md:flex-row items-center justify-between p-6 bg-slate-900/40 border border-white/5 rounded-3xl transition-all duration-500 hover:bg-slate-900/60 hover:border-blue-500/30">
-                  <div className="flex items-center gap-6 w-full md:w-auto">
-                    <div className="size-16 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center font-black text-white text-2xl shadow-xl shadow-blue-500/20">
-                      {doc.userId?.name?.[0]?.toUpperCase()}
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <p className="text-white text-lg font-black tracking-tight group-hover:text-blue-400 transition-colors uppercase">Dr. {doc.userId?.name}</p>
-                      <div className="flex items-center gap-2">
-                        <span className="text-white/40 text-[10px] font-bold uppercase tracking-widest">{doc.specialization}</span>
-                        <span className="w-1 h-1 bg-white/10 rounded-full"></span>
-                        <span className="text-white/20 text-[10px] font-medium">{doc.userId?.email}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-4 w-full md:w-auto mt-6 md:mt-0">
-                    <button 
-                      className="flex-1 md:flex-none px-10 py-3.5 bg-blue-500 hover:bg-blue-600 text-white rounded-2xl text-[10px] font-black tracking-widest uppercase transition-all shadow-xl shadow-blue-500/30 active:scale-95 flex items-center justify-center gap-2"
-                      onClick={() => handleApprove(doc._id, 'approve')}
-                    >
-                      <CheckCircle size={16} /> Approve Access
-                    </button>
-                    <button 
-                      className="flex-1 md:flex-none px-6 py-3.5 bg-white/5 hover:bg-red-500/10 text-white/30 hover:text-red-400 rounded-2xl text-[10px] font-black tracking-widest uppercase transition-all border border-white/5 hover:border-red-500/20 active:scale-95 flex items-center justify-center gap-2"
-                      onClick={() => handleApprove(doc._id, 'reject')}
-                    >
-                      <XCircle size={16} /> Reject
-                    </button>
-                  </div>
-                </div>
+          <div style={{ gridColumn: 'span 2' }}>
+            <label style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: '8px' }}>Approval Status</label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {[true, false].map(v => (
+                <button key={String(v)} type="button" onClick={() => setForm(p => ({ ...p, isApproved: v }))}
+                  style={{ flex: 1, padding: '10px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', border: `0.5px solid ${form.isApproved === v ? (v ? 'rgba(34,197,94,0.4)' : 'rgba(244,63,94,0.4)') : 'rgba(255,255,255,0.08)'}`, background: form.isApproved === v ? (v ? 'rgba(34,197,94,0.12)' : 'rgba(244,63,94,0.08)') : 'rgba(255,255,255,0.02)', color: form.isApproved === v ? (v ? '#4ade80' : '#fb7185') : 'rgba(255,255,255,0.3)', cursor: 'pointer', transition: 'all 0.15s' }}>
+                  {v ? 'Approved' : 'Not Approved'}
+                </button>
               ))}
             </div>
-          )}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            style={{ flex: 2, padding: '12px', borderRadius: '12px', background: '#3b82f6', border: 'none', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <Save size={14} />
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
+// ─── Main Component ────────────────────────────────────────────────────────────
+export default function AdminDashboard() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  const [stats, setStats]           = useState(null);
+  const [allDoctors, setAllDoctors] = useState([]);
+  const [allPatients, setAllPatients] = useState([]);
+  const [allApts, setAllApts]       = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [activeTab, setActiveTab]   = useState('pending');
+  const [editDoctor, setEditDoctor] = useState(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [statsRes, doctorsRes, patientsRes, aptsRes] = await Promise.all([
+        fetch('/api/admin', { credentials: 'include' }),
+        fetch('/api/admin?type=doctors', { credentials: 'include' }),
+        fetch('/api/admin?type=patients', { credentials: 'include' }),
+        fetch('/api/admin?type=appointments', { credentials: 'include' }),
+      ]);
+      const [statsData, doctorsData, patientsData, aptsData] = await Promise.all([
+        statsRes.json(), doctorsRes.json(), patientsRes.json(), aptsRes.json(),
+      ]);
+      setStats(statsData);
+      setAllDoctors(doctorsData.doctors || []);
+      setAllPatients(patientsData.patients || []);
+      setAllApts(aptsData.appointments || []);
+    } catch {
+      toast.error('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleApprove = async (doctorId, action) => {
+    try {
+      await fetch('/api/admin', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doctorId, action }),
+      });
+      toast.success(action === 'approve' ? 'Doctor approved' : 'Doctor rejected');
+      fetchData();
+    } catch {
+      toast.error('Failed to update');
+    }
+  };
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) { router.push('/login'); return; }
+    if (user.role !== 'admin') { router.push('/'); return; }
+    fetchData();
+  }, [user, authLoading, router, fetchData]);
+
+  if (!user || user.role !== 'admin') return null;
+
+  const pendingDoctors = allDoctors.filter(d => !d.isApproved);
+  const approvedDoctors = allDoctors.filter(d => d.isApproved);
+
+  const tabList = [
+    { id: 'pending',      label: 'Pending Approvals', count: pendingDoctors.length,   urgent: true },
+    { id: 'doctors',      label: 'All Doctors',        count: allDoctors.length },
+    { id: 'patients',     label: 'All Patients',       count: allPatients.length },
+    { id: 'appointments', label: 'Appointments',       count: allApts.length },
+  ];
+
+  const tableHeader = (cols) => (
+    <div style={{ display: 'grid', gridTemplateColumns: cols, gap: '16px', padding: '12px 28px', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
+      {['Doctor','Specialization','Fee','Status','Action'].map((h, i) => (
+        <span key={h} style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.2)', textAlign: i === 4 ? 'right' : 'left' }}>{h}</span>
+      ))}
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', paddingBottom: '80px' }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.2)', marginBottom: '4px' }}>System Administrator</div>
+          <h1 style={{ fontSize: '26px', fontWeight: '900', color: '#fff', letterSpacing: '-0.5px', margin: 0 }}>Admin Dashboard</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '99px', background: 'rgba(59,130,246,0.1)', border: '0.5px solid rgba(59,130,246,0.2)' }}>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#60a5fa' }} />
+          <span style={{ fontSize: '11px', fontWeight: '600', color: '#60a5fa' }}>Admin Access</span>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+        {[
+          { label: 'Total Users',        value: stats?.totalUsers || 0,        iconColor: '#60a5fa', iconBg: 'rgba(59,130,246,0.12)',  Icon: Users },
+          { label: 'Approved Doctors',   value: stats?.totalDoctors || 0,      iconColor: '#4ade80', iconBg: 'rgba(34,197,94,0.12)',   Icon: Stethoscope },
+          { label: 'Appointments',       value: stats?.totalAppointments || 0, iconColor: '#a78bfa', iconBg: 'rgba(139,92,246,0.12)',  Icon: Calendar },
+          { label: 'Pending Approvals',  value: stats?.pendingDoctors || 0,    iconColor: '#fbbf24', iconBg: 'rgba(245,158,11,0.12)', Icon: Clock, highlight: true },
+        ].map(s => (
+          <div key={s.label} style={{ ...card, padding: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: s.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <s.Icon size={18} style={{ color: s.iconColor }} />
+            </div>
+            <div>
+              <div style={{ fontSize: '24px', fontWeight: '800', color: s.highlight ? '#fbbf24' : '#fff', lineHeight: 1 }}>
+                {loading ? '—' : s.value}
+              </div>
+              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: '3px' }}>{s.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '10px' }}>
+        {tabList.map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '12px', fontSize: '13px', fontWeight: '600', border: `0.5px solid ${isActive ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)'}`, background: isActive ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)', color: isActive ? '#fff' : 'rgba(255,255,255,0.35)', cursor: 'pointer', transition: 'all 0.2s' }}>
+              {tab.label}
+              <span style={{ padding: '2px 7px', borderRadius: '99px', fontSize: '11px', fontWeight: '700', background: tab.urgent ? 'rgba(245,158,11,0.15)' : isActive ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)', color: tab.urgent ? '#fbbf24' : isActive ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+                {loading ? '—' : tab.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Table */}
+      <div style={{ ...card, overflow: 'hidden' }}>
+
+        {/* ── Pending Approvals ── */}
+        {activeTab === 'pending' && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1.5fr', gap: '16px', padding: '12px 28px', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
+              {['Doctor', 'Specialization', 'Fee', 'Experience', 'Action'].map((h, i) => (
+                <span key={h} style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.2)', textAlign: i === 4 ? 'right' : 'left' }}>{h}</span>
+              ))}
+            </div>
+            {loading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+                <div className="size-8 border-2 border-blue-500/20 border-t-blue-500 animate-spin rounded-full" />
+              </div>
+            ) : pendingDoctors.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', gap: '12px' }}>
+                <CheckCircle size={28} style={{ color: 'rgba(34,197,94,0.3)' }} />
+                <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '14px', fontWeight: '600', margin: 0 }}>No pending approvals</p>
+              </div>
+            ) : pendingDoctors.map((doc, i) => {
+              const name = doc.userId?.name || 'Unknown';
+              const { bg, text } = avatarColor(name);
+              return (
+                <div key={doc._id} style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1.5fr', gap: '16px', padding: '18px 28px', alignItems: 'center', borderBottom: i !== pendingDoctors.length - 1 ? '0.5px solid rgba(255,255,255,0.04)' : 'none', transition: 'background 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                    <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: text }}>{getInitials(name)}</span>
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontSize: '13px', fontWeight: '600', color: '#fff', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Dr. {name}</p>
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>{doc.userId?.email}</p>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{doc.specialization}</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>₹{doc.fee?.toLocaleString() || '—'}</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{doc.experience ? `${doc.experience} yrs` : '—'}</span>
+                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <button onClick={() => handleApprove(doc._id, 'approve')}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 14px', borderRadius: '8px', background: 'rgba(34,197,94,0.12)', border: '0.5px solid rgba(34,197,94,0.25)', color: '#4ade80', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                      <CheckCircle size={12} /> Approve
+                    </button>
+                    <button onClick={() => handleApprove(doc._id, 'reject')}
+                      style={{ display: 'flex', alignItems: 'center', padding: '7px 10px', borderRadius: '8px', background: 'rgba(244,63,94,0.08)', border: '0.5px solid rgba(244,63,94,0.15)', color: '#fb7185', cursor: 'pointer' }}>
+                      <XCircle size={12} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {/* ── All Doctors ── */}
+        {activeTab === 'doctors' && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1fr 1.2fr', gap: '16px', padding: '12px 28px', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
+              {['Doctor', 'Specialization', 'Fee', 'Rating', 'Status', 'Action'].map((h, i) => (
+                <span key={h} style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.2)', textAlign: i === 5 ? 'right' : 'left' }}>{h}</span>
+              ))}
+            </div>
+            {loading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+                <div className="size-8 border-2 border-blue-500/20 border-t-blue-500 animate-spin rounded-full" />
+              </div>
+            ) : allDoctors.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+                <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '14px', fontWeight: '600', margin: 0 }}>No doctors found</p>
+              </div>
+            ) : allDoctors.map((doc, i) => {
+              const name = doc.userId?.name || 'Unknown';
+              const { bg, text } = avatarColor(name);
+              const isApproved = doc.isApproved;
+              return (
+                <div key={doc._id} style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1fr 1fr 1fr 1.2fr', gap: '16px', padding: '18px 28px', alignItems: 'center', borderBottom: i !== allDoctors.length - 1 ? '0.5px solid rgba(255,255,255,0.04)' : 'none', transition: 'background 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                    <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: text }}>{getInitials(name)}</span>
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontSize: '13px', fontWeight: '600', color: '#fff', margin: 0 }}>Dr. {name}</p>
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>{doc.userId?.email}</p>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{doc.specialization}</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>₹{doc.fee?.toLocaleString() || '—'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Star size={11} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                    <span style={{ fontSize: '12px', color: '#fff', fontWeight: '600' }}>{doc.rating > 0 ? Number(doc.rating).toFixed(1) : '—'}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '99px', background: isApproved ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', border: `0.5px solid ${isApproved ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}`, width: 'fit-content' }}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: isApproved ? '#4ade80' : '#fbbf24' }} />
+                    <span style={{ fontSize: '10px', fontWeight: '600', color: isApproved ? '#4ade80' : '#fbbf24' }}>{isApproved ? 'Approved' : 'Pending'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button onClick={() => setEditDoctor(doc)}
+                      style={{ padding: '7px 14px', borderRadius: '8px', background: 'rgba(59,130,246,0.1)', border: '0.5px solid rgba(59,130,246,0.2)', color: '#60a5fa', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {/* ── All Patients ── */}
+        {activeTab === 'patients' && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr', gap: '16px', padding: '12px 28px', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
+              {['Patient', 'Email', 'Blood Group', 'Joined'].map(h => (
+                <span key={h} style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.2)' }}>{h}</span>
+              ))}
+            </div>
+            {loading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+                <div className="size-8 border-2 border-blue-500/20 border-t-blue-500 animate-spin rounded-full" />
+              </div>
+            ) : allPatients.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+                <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '14px', fontWeight: '600', margin: 0 }}>No patients found</p>
+              </div>
+            ) : allPatients.map((pat, i) => {
+              const { bg, text } = avatarColor(pat.name || '');
+              return (
+                <div key={pat._id} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr', gap: '16px', padding: '18px 28px', alignItems: 'center', borderBottom: i !== allPatients.length - 1 ? '0.5px solid rgba(255,255,255,0.04)' : 'none', transition: 'background 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                    <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {pat.avatar ? (
+                        <img src={pat.avatar} alt={pat.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                      ) : (
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: text }}>{getInitials(pat.name)}</span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '13px', fontWeight: '600', color: '#fff', margin: 0 }}>{pat.name || '—'}</p>
+                  </div>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pat.email}</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{pat.bloodGroup || '—'}</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{formatDate(pat.createdAt)}</span>
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {/* ── All Appointments ── */}
+        {activeTab === 'appointments' && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1.2fr 1fr 1fr', gap: '16px', padding: '12px 28px', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
+              {['Patient', 'Doctor', 'Date', 'Time', 'Status'].map(h => (
+                <span key={h} style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.2)' }}>{h}</span>
+              ))}
+            </div>
+            {loading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+                <div className="size-8 border-2 border-blue-500/20 border-t-blue-500 animate-spin rounded-full" />
+              </div>
+            ) : allApts.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 0' }}>
+                <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '14px', fontWeight: '600', margin: 0 }}>No appointments found</p>
+              </div>
+            ) : allApts.map((apt, i) => {
+              const { label, color, bg, border, dot } = getStatusStyle(apt.status);
+              const patName = apt.patientId?.name || 'Patient';
+              const docName = apt.doctorId?.userId?.name || 'Doctor';
+              return (
+                <div key={apt._id} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1.2fr 1fr 1fr', gap: '16px', padding: '18px 28px', alignItems: 'center', borderBottom: i !== allApts.length - 1 ? '0.5px solid rgba(255,255,255,0.04)' : 'none', transition: 'background 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>{patName}</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Dr. {docName}</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{formatDate(apt.date)}</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{apt.timeSlot || '—'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '99px', background: bg, border: `0.5px solid ${border}`, width: 'fit-content' }}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: dot }} />
+                    <span style={{ fontSize: '10px', fontWeight: '600', color }}>{label}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
+
+      {/* Edit Modal */}
+      {editDoctor && (
+        <EditDoctorModal
+          doctor={editDoctor}
+          onClose={() => setEditDoctor(null)}
+          onSave={fetchData}
+        />
+      )}
+    </div>
+  );
+}

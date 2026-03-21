@@ -11,33 +11,35 @@ export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [socket, setSocket] = useState(null);
+  const [lastLockExpiry, setLastLockExpiry] = useState(null);
+  const normalizedUserId = user?.userId || user?.id || user?._id;
 
   // Load from local storage on mount
   useEffect(() => {
-    const saved = localStorage.getItem(`notifications_${user?.userId}`);
+    const saved = localStorage.getItem(`notifications_${normalizedUserId}`);
     if (saved) {
       const parsed = JSON.parse(saved);
       setNotifications(parsed);
       setUnreadCount(parsed.filter(n => !n.read).length);
     }
-  }, [user]);
+  }, [normalizedUserId]);
 
   // Sync with local storage
   useEffect(() => {
-    if (user?.userId) {
-      localStorage.setItem(`notifications_${user.userId}`, JSON.stringify(notifications));
+    if (normalizedUserId) {
+      localStorage.setItem(`notifications_${normalizedUserId}`, JSON.stringify(notifications));
       setUnreadCount(notifications.filter(n => !n.read).length);
     }
-  }, [notifications, user]);
+  }, [notifications, normalizedUserId]);
 
   useEffect(() => {
-    if (!user?.userId) return;
+    if (!normalizedUserId) return;
 
     const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001');
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      newSocket.emit('identify', { userId: user.userId });
+      newSocket.emit('identify', { userId: normalizedUserId });
     });
 
     newSocket.on('new-notification', (notification) => {
@@ -45,12 +47,21 @@ export function NotificationProvider({ children }) {
         { ...notification, read: false, id: Date.now() },
         ...prev
       ].slice(0, 50)); // Keep last 50
-      
-      // Play a subtle sound or trigger haptic if needed
+    });
+
+    newSocket.on('doctor-rating-updated', (data) => {
+      setLastRatingUpdate(data);
+    });
+
+    newSocket.on('lock-expired', (data) => {
+      console.log('🔄 Lock expired (Socket):', data);
+      setLastLockExpiry(data);
     });
 
     return () => newSocket.disconnect();
-  }, [user]);
+  }, [normalizedUserId]);
+
+  const [lastRatingUpdate, setLastRatingUpdate] = useState(null);
 
   const markAsRead = useCallback((id) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
@@ -70,7 +81,11 @@ export function NotificationProvider({ children }) {
       unreadCount, 
       markAsRead, 
       markAllAsRead, 
-      clearNotifications 
+      clearNotifications,
+      markAllAsRead, 
+      clearNotifications,
+      lastRatingUpdate,
+      lastLockExpiry
     }}>
       {children}
     </NotificationContext.Provider>

@@ -1,99 +1,108 @@
 'use client';
-
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import {
-  User, Camera, Phone, Calendar, Droplets, MapPin, AlertCircle,
-  Stethoscope, LogOut, Save, ChevronLeft, Shield, Sparkles,
-  Heart, Activity, Thermometer
-} from 'lucide-react';
+import { Camera, X, Save, User, Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { motion, AnimatePresence } from 'framer-motion';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-const GENDERS = ['male', 'female', 'other'];
+const GENDERS      = ['male', 'female', 'other'];
+
+function getInitials(name = '') {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+}
+
+function inp(extra = {}) {
+  return {
+    style: {
+      width: '100%', background: 'rgba(255,255,255,0.03)',
+      border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px',
+      padding: '12px 16px', fontSize: '14px', color: '#fff', outline: 'none',
+      boxSizing: 'border-box', transition: 'border-color 0.15s', ...extra,
+    },
+    onFocus: e => { if (!e.target.disabled) e.target.style.borderColor = 'rgba(59,130,246,0.5)'; },
+    onBlur:  e => e.target.style.borderColor = 'rgba(255,255,255,0.08)',
+  };
+}
+
+const card = { background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.07)', borderRadius: '20px' };
+
+function Label({ children }) {
+  return <label style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: '7px' }}>{children}</label>;
+}
+
+function SectionHeader({ icon: Icon, title, color, bg }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+      <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon size={14} style={{ color }} />
+      </div>
+      <span style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>{title}</span>
+    </div>
+  );
+}
 
 export default function PatientProfile() {
-  const { user, loading: authLoading, logout, refreshUser } = useAuth();
-  const router = useRouter();
-  const fileInputRef = useRef(null);
+  const { user, loading: authLoading, refreshUser } = useAuth();
+  const router  = useRouter();
+  const fileRef = useRef(null);
 
   const [form, setForm] = useState({
-    name: '', phone: '', dob: '', gender: '', bloodGroup: '', address: '', allergies: '', avatar: '',
+    name: '', phone: '', dob: '', gender: '',
+    bloodGroup: '', address: '', allergies: '', avatar: '',
   });
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]   = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) { router.push('/login'); return; }
-    
-    const fetchProfile = async () => {
-      try {
-        const res = await fetch('/api/profile/patient');
-        const data = await res.json();
+    fetch('/api/profile/patient', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => {
         if (data.user) {
           const u = data.user;
           setForm({
-            name: u.name || '',
-            phone: u.phone || '',
-            dob: u.dob ? u.dob.split('T')[0] : '',
-            gender: u.gender || '',
+            name:       u.name       || '',
+            phone:      u.phone      || '',
+            dob:        u.dob ? u.dob.split('T')[0] : '',
+            gender:     u.gender     || '',
             bloodGroup: u.bloodGroup || '',
-            address: u.address || '',
-            allergies: u.allergies || '',
-            avatar: u.avatar || '',
+            address:    u.address    || '',
+            allergies:  u.allergies  || '',
+            avatar:     u.avatar     || '',
           });
         }
-      } catch (err) {
-        console.error('Failed to fetch profile:', err);
-      } finally {
         setLoading(false);
-      }
-    };
-    
-    fetchProfile();
+      })
+      .catch(() => setLoading(false));
   }, [user, authLoading]);
 
-  const handleImageChange = (e) => {
+  const handleImage = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 1.5 * 1024 * 1024) {
-      toast.error('Image must be under 1.5 MB');
-      return;
-    }
+    if (file.size > 1.5 * 1024 * 1024) { toast.error('Image must be under 1.5MB'); return; }
     const reader = new FileReader();
     reader.onloadend = () => setForm(f => ({ ...f, avatar: reader.result }));
     reader.readAsDataURL(file);
   };
 
   const handleSave = async (e) => {
-    if (e) e.preventDefault();
+    e?.preventDefault();
     setSaving(true);
     try {
       const res = await fetch('/api/profile/patient', {
         method: 'PUT',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save');
-      
-      // Update local context for real-time sidebar/global sync
-      await refreshUser();
-      
-      toast.success('Profile updated successfully!', {
-        icon: '💎',
-        style: {
-          borderRadius: '16px',
-          background: 'rgba(255, 255, 255, 0.1)',
-          color: '#fff',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-        }
-      });
+      await refreshUser?.();
+      const stored = JSON.parse(localStorage.getItem('sanjeevni_user') || '{}');
+      localStorage.setItem('sanjeevni_user', JSON.stringify({ ...stored, name: form.name, avatar: form.avatar }));
+      toast.success('Profile saved successfully');
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -101,226 +110,173 @@ export default function PatientProfile() {
     }
   };
 
-  if (!user && !authLoading) return null;
+  if (!user || loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', flexDirection: 'column', gap: '16px' }}>
+      <div className="size-10 border-2 border-blue-500/20 border-t-blue-500 animate-spin rounded-full" />
+      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Loading...</p>
+    </div>
+  );
 
-  const initials = form.name?.[0]?.toUpperCase() || '?';
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { y: 0, opacity: 1 }
-  };
+  const formattedDob = form.dob
+    ? new Date(form.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '—';
 
   return (
-    <div className="w-full relative min-h-[calc(100vh-150px)] flex flex-col items-center justify-center p-4">
-      <style jsx global>{`
-        .premium-input {
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 14px;
-          padding: 12px 18px;
-          color: white;
-          width: 100%;
-          transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-          font-size: 14px;
-          backdrop-filter: blur(10px);
-        }
-        .premium-input:focus {
-          outline: none;
-          border-color: rgba(255, 255, 255, 0.3);
-          background: rgba(255, 255, 255, 0.04);
-          box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
-        }
-        .glass-card-new {
-          background: rgba(255, 255, 255, 0.01);
-          backdrop-filter: blur(30px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 24px;
-          position: relative;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-        .field-label {
-          font-size: 11px;
-          font-weight: 600;
-          color: rgba(255, 255, 255, 0.4);
-          margin-bottom: 8px;
-          margin-left: 4px;
-          display: block;
-        }
-      `}</style>
+    <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', paddingBottom: '80px' }}>
 
-      <motion.main 
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="max-w-5xl w-full space-y-10 py-12 relative z-10"
-      >
-        {/* Header Section */}
-        <motion.div variants={itemVariants} className="flex flex-col items-center text-center space-y-2 mb-10">
-          <h1 className="text-4xl font-bold tracking-tight text-white/90">Health profile</h1>
-        </motion.div>
+      {/* Header */}
+      <div>
+        <div style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.2)', marginBottom: '4px' }}>Patient Portal</div>
+        <h1 style={{ fontSize: '26px', fontWeight: '900', color: '#fff', letterSpacing: '-0.5px', margin: 0 }}>My Profile</h1>
+      </div>
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="size-10 border-2 border-white/5 border-t-white animate-spin rounded-full" />
-            <p className="text-white/20 text-[10px] font-medium tracking-widest uppercase">Initializing neural link</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
-            {/* Left Column (Identity & Core) */}
-            <div className="lg:col-span-4 space-y-8">
-              {/* Identity Card (Horizontal) */}
-              <motion.div variants={itemVariants} className="glass-card-new p-8 flex items-center gap-6">
-                <div 
-                  className="relative cursor-pointer shrink-0"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <div className="size-24 rounded-3xl flex items-center justify-center border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)] overflow-hidden transition-all hover:border-white/30 group">
-                    {form.avatar ? (
-                      <img src={form.avatar} alt="Profile" className="size-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                    ) : (
-                      <div className="size-full bg-white/5 flex items-center justify-center text-3xl font-bold text-white/20">
-                        {initials}
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <Camera size={20} className="text-white" />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex-1 space-y-1">
-                  <h2 className="text-xl font-bold text-white/90">{form.name || 'Set Name'}</h2>
-                  <div className="text-[11px] text-white/40 font-medium flex items-center gap-2">
-                    <span>{form.bloodGroup || '--'}</span>
-                    <span className="text-white/10">•</span>
-                    <span>Blood group</span>
-                  </div>
-                </div>
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-              </motion.div>
+      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '20px', alignItems: 'start' }}>
 
-              {/* Identity Information Section */}
-              <motion.section variants={itemVariants} className="glass-card-new p-10 border border-white/5">
-                <div className="flex items-center gap-3 mb-8">
-                  <User size={16} className="text-white/30" />
-                  <h3 className="text-sm font-semibold text-white/60">Identity link</h3>
-                </div>
+        {/* ── Left Column ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-                <div className="space-y-6">
-                  <div>
-                    <span className="field-label">Registry name</span>
-                    <input 
-                      className="premium-input" 
-                      value={form.name} 
-                      onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                      placeholder="Enter full name"
-                    />
-                  </div>
-                  <div>
-                    <span className="field-label">Biometric ID (phone)</span>
-                    <input 
-                      className="premium-input" 
-                      value={form.phone} 
-                      onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                      placeholder="+91..."
-                    />
-                  </div>
-                  <div>
-                    <span className="field-label">Gender allocation</span>
-                    <select 
-                      className="premium-input"
-                      value={form.gender}
-                      onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}
-                    >
-                      <option value="">Select</option>
-                      {GENDERS.map(g => <option key={g} value={g}>{g.charAt(0).toUpperCase() + g.slice(1)}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <span className="field-label">Timeline of origin</span>
-                    <input 
-                      type="date"
-                      className="premium-input" 
-                      value={form.dob} 
-                      onChange={e => setForm(f => ({ ...f, dob: e.target.value }))}
-                    />
-                  </div>
+          {/* Avatar + Summary Card */}
+          <div style={{ ...card, padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', textAlign: 'center' }}>
+
+            {/* Avatar */}
+            <div style={{ position: 'relative' }}>
+              {form.avatar ? (
+                <img src={form.avatar} alt="avatar"
+                  style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.1)' }} />
+              ) : (
+                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: '28px', fontWeight: '800', color: '#60a5fa' }}>{getInitials(form.name)}</span>
                 </div>
-              </motion.section>
+              )}
+              {/* Camera button */}
+              <button type="button" onClick={() => fileRef.current?.click()}
+                style={{ position: 'absolute', bottom: '0', right: '0', width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 2, transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#3b82f6'; e.currentTarget.style.borderColor = '#3b82f6'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.7)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; }}>
+                <Camera size={11} style={{ color: '#fff' }} />
+              </button>
+              {/* Remove button */}
+              {form.avatar && (
+                <button type="button" onClick={() => setForm(f => ({ ...f, avatar: '' }))}
+                  style={{ position: 'absolute', top: '-2px', left: '-2px', width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 2, transition: 'all 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#fb7185'; e.currentTarget.style.borderColor = '#fb7185'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.7)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; }}>
+                  <X size={10} style={{ color: '#fff' }} />
+                </button>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImage} />
             </div>
 
-            {/* Right Column (Clinical & Actions) */}
-            <div className="lg:col-span-8 space-y-8">
-              {/* Clinical Information Section */}
-              <motion.section variants={itemVariants} className="glass-card-new p-10 border border-white/5">
-                <div className="flex items-center gap-3 mb-10">
-                  <Activity size={18} className="text-white/30" />
-                  <h3 className="text-sm font-semibold text-white/60">Clinical metadata</h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-10">
-                  <div className="md:col-span-1">
-                    <span className="field-label">Hematology group</span>
-                    <select 
-                      className="premium-input"
-                      value={form.bloodGroup}
-                      onChange={e => setForm(f => ({ ...f, bloodGroup: e.target.value }))}
-                    >
-                      <option value="">Select</option>
-                      {BLOOD_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                  </div>
-                  <div className="md:col-span-1">
-                    <span className="field-label">Primary email</span>
-                    <input className="premium-input opacity-40 cursor-not-allowed" value={user.email} disabled />
-                  </div>
-                  <div className="md:col-span-2">
-                    <span className="field-label">Geographic coordinates (address)</span>
-                    <input 
-                      className="premium-input" 
-                      placeholder="Specify your residential locus..."
-                      value={form.address} 
-                      onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <span className="field-label">Sensitive pathologies / allergies</span>
-                    <textarea 
-                      className="premium-input min-h-[160px] resize-none" 
-                      placeholder="Specify critical medical metadata or chronic pathologies..."
-                      value={form.allergies} 
-                      onChange={e => setForm(f => ({ ...f, allergies: e.target.value }))}
-                    />
-                  </div>
-                </div>
-              </motion.section>
-
-            {/* Save Button (Centered Rounded Full) */}
-            <div className="lg:col-span-12 flex justify-center pt-10">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleSave}
-                disabled={saving}
-                className="px-24 py-6 rounded-full bg-white/5 hover:bg-white border border-white/10 hover:border-white text-white/80 hover:text-black font-bold text-sm tracking-widest uppercase backdrop-blur-xl shadow-2xl transition-all duration-300 disabled:opacity-30"
-              >
-                {saving ? 'Saving changes...' : 'Save changes'}
-              </motion.button>
+            <div>
+              <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#fff', margin: '0 0 3px' }}>{form.name || 'Your Name'}</h2>
+              <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>{user.email}</p>
             </div>
+
+            <div style={{ height: '0.5px', background: 'rgba(255,255,255,0.06)', width: '100%' }} />
+
+            {/* Quick stats */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
+              {[
+                { label: 'Blood group', value: form.bloodGroup || '—', highlight: !!form.bloodGroup, color: '#f87171', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.25)' },
+                { label: 'Date of birth', value: formattedDob },
+                { label: 'Gender', value: form.gender ? form.gender.charAt(0).toUpperCase() + form.gender.slice(1) : '—' },
+                { label: 'Phone', value: form.phone || '—' },
+              ].map(item => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>{item.label}</span>
+                  {item.highlight ? (
+                    <span style={{ padding: '3px 10px', borderRadius: '99px', background: item.bg, border: `0.5px solid ${item.border}`, fontSize: '11px', fontWeight: '700', color: item.color }}>{item.value}</span>
+                  ) : (
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#fff' }}>{item.value}</span>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
-        )}
-      </motion.main>
-    </div>
+
+          {/* Blood Group Picker */}
+          <div style={{ ...card, padding: '20px 22px' }}>
+            <SectionHeader icon={Activity} title="Blood Group" color="#f87171" bg="rgba(239,68,68,0.1)" />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+              {BLOOD_GROUPS.map(g => {
+                const isActive = form.bloodGroup === g;
+                return (
+                  <button key={g} type="button" onClick={() => setForm(f => ({ ...f, bloodGroup: g }))}
+                    style={{ padding: '6px 14px', borderRadius: '99px', fontSize: '12px', fontWeight: '700', border: `0.5px solid ${isActive ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.08)'}`, background: isActive ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.02)', color: isActive ? '#f87171' : 'rgba(255,255,255,0.35)', cursor: 'pointer', transition: 'all 0.15s' }}>
+                    {g}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Save button */}
+          <button type="submit" disabled={saving}
+            style={{ width: '100%', padding: '16px', borderRadius: '14px', background: 'rgba(0,0,0,0.6)', border: '0.5px solid rgba(255,255,255,0.2)', color: '#fff', fontSize: '14px', fontWeight: '700', cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s', opacity: saving ? 0.5 : 1 }}
+            onMouseEnter={e => { if (!saving) { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#000'; e.currentTarget.style.borderColor = '#fff'; }}}
+            onMouseLeave={e => { if (!saving) { e.currentTarget.style.background = 'rgba(0,0,0,0.6)'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; }}}>
+            <Save size={15} />
+            {saving ? 'Saving...' : 'Save All Changes'}
+          </button>
+        </div>
+
+        {/* ── Right Column ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+          {/* Personal Info */}
+          <div style={{ ...card, padding: '24px 28px' }}>
+            <SectionHeader icon={User} title="Personal Info" color="#60a5fa" bg="rgba(59,130,246,0.1)" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <Label>Full name</Label>
+                <input {...inp()} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Your full name" required />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <input {...inp({ opacity: 0.4, cursor: 'not-allowed' })} value={user.email} disabled />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <input {...inp()} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+91 98765 43210" />
+              </div>
+              <div>
+                <Label>Date of birth</Label>
+                <input {...inp()} type="date" value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <Label>Gender</Label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {GENDERS.map(g => {
+                    const isActive = form.gender === g;
+                    return (
+                      <button key={g} type="button" onClick={() => setForm(f => ({ ...f, gender: g }))}
+                        style={{ flex: 1, padding: '11px 8px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', border: `0.5px solid ${isActive ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.07)'}`, background: isActive ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.02)', color: isActive ? '#60a5fa' : 'rgba(255,255,255,0.3)', cursor: 'pointer', transition: 'all 0.15s' }}>
+                        {g.charAt(0).toUpperCase() + g.slice(1)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Medical Info */}
+          <div style={{ ...card, padding: '24px 28px' }}>
+            <SectionHeader icon={Activity} title="Medical Info" color="#fbbf24" bg="rgba(245,158,11,0.1)" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <Label>Address</Label>
+                <input {...inp()} value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Your home address" />
+              </div>
+              <div>
+                <Label>Allergies / medical conditions</Label>
+                <textarea {...inp({ resize: 'none', minHeight: '110px' })} value={form.allergies} onChange={e => setForm(f => ({ ...f, allergies: e.target.value }))} placeholder="List any known allergies or chronic conditions..." />
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </form>
   );
 }

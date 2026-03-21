@@ -319,15 +319,19 @@ function HealthChat({ messages, setMessages, chatId, setChatId, loading, setLoad
                       transition={{ duration: 3, repeat: Infinity }}
                       style={{ position: 'absolute', inset: -4, background: 'rgba(255, 255, 255, 0.2)', borderRadius: 14, filter: 'blur(8px)' }}
                     />
-                    <div style={{ 
-                      width: 40, height: 40, borderRadius: 14, 
-                      background: 'rgba(255, 255, 255, 0.05)', 
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                      color: 'white', border: '1px solid rgba(255, 255, 255, 0.1)',
-                      position: 'relative', zIndex: 1
-                    }}>
+                    <motion.div 
+                      whileHover={{ scale: 1.1, backgroundColor: 'rgba(255,255,255,0.1)' }}
+                      style={{ 
+                        width: 40, height: 40, borderRadius: 14, 
+                        background: 'rgba(255, 255, 255, 0.05)', 
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                        color: 'white', border: '1px solid rgba(255, 255, 255, 0.1)',
+                        position: 'relative', zIndex: 1,
+                        cursor: 'help'
+                      }}
+                    >
                       <Bot size={20} />
-                    </div>
+                    </motion.div>
                   </div>
                 )}
                 
@@ -354,9 +358,12 @@ function HealthChat({ messages, setMessages, chatId, setChatId, loading, setLoad
                 </div>
 
                 {m.role === 'user' && (
-                  <div style={{ width: 40, height: 40, borderRadius: 14, background: 'rgba(255, 255, 255, 0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <motion.div 
+                    whileHover={{ scale: 1.1, backgroundColor: 'rgba(255,255,255,0.06)' }}
+                    style={{ width: 40, height: 40, borderRadius: 14, background: 'rgba(255, 255, 255, 0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer' }}
+                  >
                     <User size={20} />
-                  </div>
+                  </motion.div>
                 )}
               </motion.div>
             ))}
@@ -589,23 +596,27 @@ export default function AIAssistantPage() {
   return (
     <div style={{ minHeight: '100vh', padding: '32px' }}>
       {/* Main Content */}
-      <main>
+      <main style={{ width: '100%', position: 'relative', zIndex: 10 }}>
         {/* Header */}
         <div style={{ marginBottom: 32, position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
-            <div style={{ 
-              width: 52, height: 52, borderRadius: 16, 
-              background: 'rgba(255, 255, 255, 0.03)', 
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
+            <motion.div 
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              style={{ 
+                width: 52, height: 52, borderRadius: 16, 
+                background: 'rgba(255, 255, 255, 0.03)', 
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                position: 'relative',
+                overflow: 'hidden',
+                cursor: 'pointer'
+              }}
+            >
               <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 20% 20%, rgba(255,255,255,0.1) 0%, transparent 50%)' }} />
               <Bot size={28} style={{ color: 'white', filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.5))', position: 'relative', zIndex: 1 }} />
-            </div>
+            </motion.div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <h1 style={{ 
@@ -636,7 +647,7 @@ export default function AIAssistantPage() {
 
         {/* Tabs */}
         <div style={{ 
-          display: 'flex', gap: 6, marginBottom: 32, 
+          display: 'flex', gap: 6, marginTop: 0, marginRight: 0, marginBottom: 40, marginLeft: 0,
           background: 'rgba(0, 0, 0, 0.4)', 
           padding: '6px', 
           borderRadius: 16, 

@@ -373,7 +373,7 @@ export default function VideoCall() {
             </div>
             <div>
               <p style={{ fontSize:'13px', fontWeight:'800', color:'#fff', margin:0, letterSpacing:'-0.3px' }}>
-                Sanjeevani <span style={{ color:'#3b82f6' }}>Call</span>
+                Sanjeevni <span style={{ color:'#3b82f6' }}>Call</span>
               </p>
               <p style={{ fontSize:'9px', color:'rgba(255,255,255,0.2)', margin:0, textTransform:'uppercase', letterSpacing:'0.15em' }}>End-to-end encrypted</p>
             </div>

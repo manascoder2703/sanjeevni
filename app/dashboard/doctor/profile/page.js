@@ -7,6 +7,7 @@ import {
   User, Briefcase, Globe, BookOpen, ChevronUp, ChevronDown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useNotifications } from '@/context/NotificationContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -209,10 +210,22 @@ export default function DoctorProfile() {
     hospital: '', clinicAddress: '', qualifications: [],
     languages: ['English'], consultationType: 'Both',
   });
-  const [meta, setMeta]           = useState({ rating: 0, totalReviews: 0, isApproved: false });
+  const [meta, setMeta]           = useState({ doctorId: null, rating: 0, totalReviews: 0, isApproved: false });
   const [loading, setLoading]     = useState(true);
   const [saving, setSaving]       = useState(false);
   const [qualInput, setQualInput] = useState('');
+  const { lastRatingUpdate } = useNotifications();
+
+  // Real-time rating update listener for the doctor's own profile
+  useEffect(() => {
+    if (lastRatingUpdate && meta.doctorId === lastRatingUpdate.doctorId) {
+      setMeta(m => ({
+        ...m,
+        rating: lastRatingUpdate.rating,
+        totalReviews: lastRatingUpdate.totalReviews
+      }));
+    }
+  }, [lastRatingUpdate, meta.doctorId]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -231,7 +244,12 @@ export default function DoctorProfile() {
             languages: d.languages?.length ? d.languages : ['English'],
             consultationType: d.consultationType || 'Both',
           });
-          setMeta({ rating: d.rating || 0, totalReviews: d.totalReviews || 0, isApproved: d.isApproved || false });
+          setMeta({ 
+            doctorId: d._id, 
+            rating: d.rating || 0, 
+            totalReviews: d.totalReviews || 0, 
+            isApproved: d.isApproved || false 
+          });
         }
         setLoading(false);
       })

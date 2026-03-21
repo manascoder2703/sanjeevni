@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
+import { useNotifications } from '@/context/NotificationContext';
 import { Search, ArrowRight, Star, Stethoscope, SlidersHorizontal, X } from 'lucide-react';
 import Link from 'next/link';
 
@@ -67,8 +68,25 @@ export default function FindDoctors() {
   const [showFilters, setShowFilters]       = useState(false);
   const [feeRange, setFeeRange]             = useState(5000);
 
+  const { lastRatingUpdate } = useNotifications();
+
   useEffect(() => { fetchDoctors(); }, [selectedSpecialty]);
 
+  // Real-time rating update listener
+  useEffect(() => {
+    if (lastRatingUpdate && doctors.length > 0) {
+      setDoctors(prev => prev.map(doc => {
+        if (doc._id === lastRatingUpdate.doctorId) {
+          return {
+            ...doc,
+            rating: lastRatingUpdate.rating,
+            totalReviews: lastRatingUpdate.totalReviews
+          };
+        }
+        return doc;
+      }));
+    }
+  }, [lastRatingUpdate]);
   const fetchDoctors = async () => {
     setLoading(true);
     try {

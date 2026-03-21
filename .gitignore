@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# logs
+*.log
+socket-server.log*
+socket-server.err.log*
+
+# temp
+tmp-*
+tests/
+.codex/

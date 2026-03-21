@@ -30,7 +30,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  useSidebar,
 } from "@/components/ui/sidebar"
 import { motion } from "framer-motion"
 
@@ -55,6 +54,11 @@ const data = {
             url: "/dashboard/patient/ai-assistant",
             icon: Bot,
           },
+          {
+            title: "Chat with Doctor",
+            url: "/dashboard/patient/chat",
+            icon: MessageSquare,
+          },
         ],
       },
       {
@@ -78,9 +82,9 @@ const data = {
             icon: LayoutDashboard,
           },
           {
-            title: "Operations",
-            url: "/dashboard/doctor/schedule",
-            icon: Calendar,
+            title: "Chat with Patient",
+            url: "/dashboard/doctor/chat",
+            icon: MessageSquare,
           },
         ],
       },
@@ -104,11 +108,6 @@ const data = {
             url: "/dashboard/admin",
             icon: ShieldCheck,
           },
-          {
-            title: "Network Nodes",
-            url: "/admin/users",
-            icon: Users,
-          },
         ],
       },
       {
@@ -129,7 +128,6 @@ export function AppSidebar({ ...props }) {
   const { user, logout } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
-  const { state, setOpen } = useSidebar()
 
   const userRole = user?.role || "patient"
   const currentNav = data.nav[userRole] || data.nav.patient
@@ -145,16 +143,13 @@ export function AppSidebar({ ...props }) {
       variant="sidebar"
       collapsible="icon" 
       className="border-r border-white/10 bg-[#000000] text-white transition-all duration-300"
-      onClick={() => {
-        if (state === "collapsed") setOpen(true)
-      }}
     >
-      <SidebarHeader className="bg-transparent border-b border-white/5 pt-40 pb-10 transition-all duration-300 group-data-[collapsible=icon]:pt-32 group-data-[collapsible=icon]:pb-8">
+      <SidebarHeader className="bg-transparent border-b border-white/5 pt-40 pb-10 transition-all duration-300 group-data-[collapsible=icon]:pt-8 group-data-[collapsible=icon]:pb-4">
         <div className="flex flex-col items-center gap-4 px-2 overflow-hidden">
           <motion.div 
             whileHover={{ rotate: 360, scale: 1.1 }}
             transition={{ type: "spring", stiffness: 100, damping: 15 }}
-            className="relative size-14 group-data-[collapsible=icon]:hidden bg-white/15 backdrop-blur-2xl border border-white/40 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(255,255,255,0.15)] overflow-hidden group/logo"
+            className="relative size-14 bg-white/15 backdrop-blur-2xl border border-white/40 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(255,255,255,0.15)] overflow-hidden group/logo transition-all duration-300 group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:rounded-xl"
           >
             {/* Ambient Shine Effect */}
             <motion.div
@@ -165,12 +160,12 @@ export function AppSidebar({ ...props }) {
             <Stethoscope className="relative z-10 size-8 group-data-[collapsible=icon]:size-5 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] transition-all duration-300" />
           </motion.div>
           <div className="flex flex-col items-center group-data-[collapsible=icon]:hidden">
-            <h1 className="text-2xl font-black tracking-tighter text-white">Sanjeevani</h1>
+            <h1 className="text-2xl font-black tracking-tighter text-white">Sanjeevni</h1>
           </div>
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="bg-transparent mt-16">
+      <SidebarContent className="bg-transparent mt-16 group-data-[collapsible=icon]:mt-6">
         {currentNav.map((group) => (
           <SidebarGroup key={group.title} className="mb-6 group-data-[collapsible=icon]:p-0">
              {group.title && (
@@ -179,13 +174,13 @@ export function AppSidebar({ ...props }) {
               </SidebarGroupLabel>
             )}
             <SidebarGroupContent>
-              <SidebarMenu className="px-3 gap-2 group-data-[collapsible=icon]:px-0">
+              <SidebarMenu className="px-3 gap-2 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-1">
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                     <SidebarMenuButton 
+                    <SidebarMenuButton 
                       asChild 
                       isActive={pathname === item.url}
-                      className="group/btn h-14 p-0 bg-transparent hover:bg-transparent group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:size-12!"
+                      className="group/btn h-14 p-0 bg-transparent hover:bg-transparent group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:rounded-xl"
                       tooltip={item.title}
                     >
                       <Link href={item.url} className="w-full h-full">
@@ -195,7 +190,7 @@ export function AppSidebar({ ...props }) {
                           initial="initial"
                            className={`
                             relative flex items-center gap-4 px-4 py-3 rounded-2xl w-full h-full transition-all duration-300 border overflow-hidden
-                            group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-2xl
+                            group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:rounded-xl
                             ${pathname === item.url 
                               ? 'bg-white/20 border-white/40 text-white shadow-[0_4px_24px_rgba(255,255,255,0.1)] backdrop-blur-xl' 
                               : 'border-transparent text-white/40 hover:text-white hover:bg-white/[0.08] hover:border-white/20 hover:backdrop-blur-md'}
@@ -213,12 +208,12 @@ export function AppSidebar({ ...props }) {
 
                           <div className={`
                             relative z-10 size-10 rounded-xl flex items-center justify-center transition-all duration-300 shrink-0
-                            group-data-[collapsible=icon]:size-12 group-data-[collapsible=icon]:rounded-none
+                            group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:rounded-lg
                             ${pathname === item.url 
                               ? 'bg-white text-black shadow-[0_0_30px_rgba(255,255,255,0.6)]' 
                               : 'bg-white/20 text-white group-hover/btn:bg-white/30 group-hover/btn:text-white'}
                           `}>
-                            {item.icon && <item.icon className="size-7 shrink-0 group-data-[collapsible=icon]:size-10 stroke-[2.5]" />}
+                            {item.icon && <item.icon className="size-5 shrink-0 group-data-[collapsible=icon]:size-5 stroke-[2.2]" />}
                           </div>
                           <span className="relative z-10 text-sm font-bold tracking-wide group-data-[collapsible=icon]:hidden opacity-0 group-data-[state=expanded]:opacity-100 transition-opacity duration-300">{item.title}</span>
                           
@@ -239,20 +234,20 @@ export function AppSidebar({ ...props }) {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="p-6 bg-transparent border-t border-white/5">
+      <SidebarFooter className="p-6 bg-transparent border-t border-white/5 group-data-[collapsible=icon]:p-2">
         <SidebarMenu>
           <SidebarMenuItem>
              <SidebarMenuButton 
               onClick={handleSignOut}
-              className="h-16 p-0 bg-transparent hover:bg-transparent overflow-hidden group-data-[collapsible=icon]:h-12"
+              className="h-16 p-0 bg-transparent hover:bg-transparent overflow-hidden group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:rounded-xl"
               tooltip="Sign Out"
             >
               <motion.div 
                 whileHover={{ scale: 1.02, backgroundColor: "rgba(239, 68, 68, 0.1)" }}
                 whileTap={{ scale: 0.98 }}
-                className="flex items-center gap-4 px-6 py-4 rounded-2xl w-full h-full border border-red-500/10 text-red-400 border-red-500/30 transition-all group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-none"
+                className="flex items-center gap-4 px-6 py-4 rounded-2xl w-full h-full border border-red-500/10 text-red-400 border-red-500/30 transition-all group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:rounded-xl"
               >
-                 <LogOut className="size-7 shrink-0 group-data-[collapsible=icon]:size-10 stroke-[2.5]" />
+                 <LogOut className="size-5 shrink-0 group-data-[collapsible=icon]:size-5 stroke-[2.2]" />
                 <span className="text-sm font-bold tracking-widest group-data-[collapsible=icon]:hidden">Sign Out</span>
               </motion.div>
             </SidebarMenuButton>

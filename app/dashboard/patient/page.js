@@ -6,6 +6,7 @@ import {
   CalendarDays, Video, Clock, CheckCircle2, XCircle,
   Activity, Users, Zap, Calendar, AlertCircle, Star, Loader2
 } from 'lucide-react';
+import { useNotifications } from '@/context/NotificationContext';
 import toast from 'react-hot-toast';
 
 function getInitials(name = '') {
@@ -23,6 +24,7 @@ function getStatusConfig(status) {
     case 'pending':   return { label: 'Pending',   color: '#fbbf24', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)', dot: '#fbbf24' };
     case 'completed': return { label: 'Completed', color: '#60a5fa', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)', dot: '#60a5fa' };
     case 'cancelled': return { label: 'Cancelled', color: '#fb7185', bg: 'rgba(244,63,94,0.1)',  border: 'rgba(244,63,94,0.2)',  dot: '#fb7185' };
+    case 'rejected':  return { label: 'Rejected',  color: '#f43f5e', bg: 'rgba(244,63,94,0.15)', border: 'rgba(244,63,94,0.3)',  dot: '#f43f5e' };
     default:          return { label: status,      color: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)', dot: 'rgba(255,255,255,0.4)' };
   }
 }
@@ -111,6 +113,27 @@ export default function PatientDashboard() {
     }
   };
 
+  const { lastRatingUpdate } = useNotifications();
+
+  // Real-time rating update listener
+  useEffect(() => {
+    if (lastRatingUpdate && appointments.length > 0) {
+      setAppointments(prev => prev.map(appt => {
+        if (appt.doctorId?._id === lastRatingUpdate.doctorId) {
+          return {
+            ...appt,
+            doctorId: {
+              ...appt.doctorId,
+              rating: lastRatingUpdate.rating,
+              totalReviews: lastRatingUpdate.totalReviews
+            }
+          };
+        }
+        return appt;
+      }));
+    }
+  }, [lastRatingUpdate]);
+
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
 
   const todayDate = new Date().toISOString().split('T')[0];
@@ -118,7 +141,7 @@ export default function PatientDashboard() {
   const upcomingAppointments  = appointments.filter(a => a.date > todayDate && a.status !== 'cancelled').sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 3);
   const activeAppointments    = appointments.filter(a => ['pending', 'confirmed'].includes(a.status));
   const pastAppointments      = appointments.filter(a => a.status === 'completed' || (a.status !== 'cancelled' && a.date < todayDate));
-  const cancelledAppointments = appointments.filter(a => a.status === 'cancelled');
+  const cancelledAppointments = appointments.filter(a => ['cancelled', 'rejected'].includes(a.status));
   const tabData = { active: activeAppointments, past: pastAppointments, cancelled: cancelledAppointments };
 
   const total          = appointments.length;
@@ -216,7 +239,15 @@ export default function PatientDashboard() {
                       <span style={{ fontSize: '12px', fontWeight: '700', color: '#60a5fa' }}>{getInitials(docName)}</span>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: '14px', fontWeight: '700', color: '#fff', margin: 0 }}>Dr. {docName}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <p style={{ fontSize: '14px', fontWeight: '700', color: '#fff', margin: 0 }}>Dr. {docName}</p>
+                        {appt.doctorId?.rating > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '2px 6px', background: 'rgba(245,158,11,0.1)', border: '0.5px solid rgba(245,158,11,0.2)', borderRadius: '6px' }}>
+                            <Star size={9} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                            <span style={{ fontSize: '10px', fontWeight: '700', color: '#fbbf24' }}>{Number(appt.doctorId.rating).toFixed(1)}</span>
+                          </div>
+                        )}
+                      </div>
                       <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>{appt.doctorId?.specialization || 'Specialist'} · {appt.timeSlot}</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '99px', background: bg, border: `1px solid ${border}`, flexShrink: 0 }}>
@@ -394,7 +425,15 @@ export default function PatientDashboard() {
                       <span style={{ fontSize: '11px', fontWeight: '700', color: '#60a5fa' }}>{getInitials(docName)}</span>
                     </div>
                     <div style={{ minWidth: 0 }}>
-                      <p style={{ fontSize: '13px', fontWeight: '600', color: '#fff', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Dr. {docName}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <p style={{ fontSize: '13px', fontWeight: '600', color: '#fff', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Dr. {docName}</p>
+                        {appt.doctorId?.rating > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+                            <Star size={9} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                            <span style={{ fontSize: '10px', fontWeight: '700', color: '#fbbf24' }}>{Number(appt.doctorId.rating).toFixed(1)}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 

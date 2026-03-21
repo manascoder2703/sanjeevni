@@ -53,15 +53,47 @@ export async function POST(request) {
       isReviewed: true
     });
 
-    // Update doctor stats
+    // Update doctor stats precisely
     const doctor = await Doctor.findById(appointment.doctorId);
     if (doctor) {
-      const currentRating = doctor.rating || 0;
-      const currentTotal = doctor.totalReviews || 0;
-      const newTotal = currentTotal + 1;
-      doctor.rating = ((currentRating * currentTotal) + Number(doctorRating)) / newTotal;
-      doctor.totalReviews = newTotal;
-      await doctor.save();
+      const stats = await Review.aggregate([
+        { $match: { doctorId: appointment.doctorId } },
+        {
+          $group: {
+            _id: '$doctorId',
+            avgRating: { $avg: '$doctorRating' },
+            totalReviews: { $sum: 1 }
+          }
+        }
+      ]);
+
+      if (stats.length > 0) {
+        const newRating = stats[0].avgRating;
+        const newTotal = stats[0].totalReviews;
+        
+        await Doctor.findByIdAndUpdate(appointment.doctorId, {
+          rating: newRating,
+          totalReviews: newTotal
+        });
+
+        // Real-time broadcast
+        try {
+          await fetch(`${process.env.INTERNAL_SOCKET_URL || 'http://localhost:3001'}/internal/broadcast`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event: 'doctor-rating-updated',
+              data: {
+                doctorId: appointment.doctorId.toString(),
+                rating: newRating,
+                totalReviews: newTotal
+              }
+            })
+          });
+        } catch (err) {
+          console.error('Failed to broadcast rating update:', err);
+        }
+      }
     }
 
     return NextResponse.json({ message: 'Review submitted successfully', review });
