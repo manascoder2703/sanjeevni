@@ -25,17 +25,24 @@ export async function GET(request) {
 
     await syncPortalConversationsForUser(user);
 
-    const conversations = await Conversation.find(getConversationAccessFilter(user))
+   const conversations = await Conversation.find({
+  ...getConversationAccessFilter(user),
+  // Only hide from doctor side — patient still sees it but with messaging locked
+  ...(user.role === 'doctor' ? { deletedByDoctor: { $ne: true } } : {}),
+})
       .populate(conversationPopulate)
       .sort({ urgent: -1, lastMessageAt: -1, updatedAt: -1 })
       .lean();
 
-    const result = conversations
-      .filter((conversation) => {
-        if (user.role !== 'patient') return true;
-        // If doctor exists, he must be approved.
-        return conversation.doctorProfileId?.isApproved !== false;
-      })
+         const result = conversations
+            .filter((conversation) => {
+            const counterpart = user.role === 'patient'
+              ? conversation.doctorUserId
+              : conversation.patientUserId;
+            if (!counterpart || !counterpart.name) return false;
+              if (user.role !== 'patient') return true;
+              return conversation.doctorProfileId?.isApproved !== false;
+  })
       .map((conversation) => serializeConversationForViewer(conversation, user));
 
     return NextResponse.json({ conversations: result });

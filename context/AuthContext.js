@@ -7,7 +7,6 @@ const AuthContext = createContext(null);
 
 function normalizeUserShape(rawUser) {
   if (!rawUser) return null;
-
   const normalizedId =
     rawUser.id ||
     rawUser.userId ||
@@ -15,43 +14,53 @@ function normalizeUserShape(rawUser) {
     rawUser?.id?.toString?.() ||
     rawUser?.userId?.toString?.() ||
     rawUser?._id?.toString?.();
-
-  return {
-    ...rawUser,
-    id: normalizedId,
-    userId: normalizedId,
-  };
+  return { ...rawUser, id: normalizedId, userId: normalizedId };
 }
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pendingOTP, setPendingOTP] = useState(null); // { email, user } when OTP is required
   const router = useRouter();
   const { data: session, status } = useSession();
 
   useEffect(() => {
-    console.log('[AuthContext] Session Status:', status);
-    if (status === 'authenticated') {
-      console.log('[AuthContext] Session Data:', session);
-    }
-    
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       try {
         const stored = localStorage.getItem('sanjeevni_user');
         if (stored) {
           const parsedUser = normalizeUserShape(JSON.parse(stored));
           setUser(parsedUser);
+          setLoading(false);
+          // Still refresh in background to be sure
+          refreshUser();
+          return;
+        }
+
+        // If no stored user, try to fetch from API (using sanjeevni_token cookie)
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            const normalizedUser = normalizeUserShape(data.user);
+            setUser(normalizedUser);
+            localStorage.setItem('sanjeevni_user', JSON.stringify(normalizedUser));
+          }
         }
       } catch (error) {
-        console.error('Failed to parse stored user:', error);
+        console.error('Failed to initialize auth:', error);
       } finally {
         if (status !== 'loading') {
           setLoading(false);
         }
       }
     };
-
     initializeAuth();
+
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+    return () => clearTimeout(timer);
   }, [status]);
 
   useEffect(() => {
@@ -61,15 +70,15 @@ export function AuthProvider({ children }) {
         email: session.user.email,
         role: session.user.role || 'patient',
         avatar: session.user.image,
-        id: session.user.id
+        id: session.user.id || session.user._id,
       });
       setUser(userData);
       localStorage.setItem('sanjeevni_user', JSON.stringify(userData));
+      setLoading(false);
     }
   }, [session]);
 
   const login = async (email, password) => {
-    console.log('--- Logging in via AuthContext ---');
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -77,27 +86,26 @@ export function AuthProvider({ children }) {
         body: JSON.stringify({ email, password }),
       });
 
-      console.log('Login response status:', res.status);
-
-      let data;
       const contentType = res.headers.get('content-type');
+      let data;
       if (contentType && contentType.includes('application/json')) {
         data = await res.json();
       } else {
-        const text = await res.text();
-        console.error('Login non-JSON response:', text);
         return { error: 'Server error: Invalid response format' };
       }
 
-      if (!res.ok) {
-        console.log('Login failed with message:', data.error);
-        return { error: data.error || 'Login failed' };
+      if (!res.ok) return { error: data.error || 'Login failed' };
+
+      if (data.otpRequired) {
+        // Store pending OTP state — do not set user yet
+        setPendingOTP({ email: data.email, user: normalizeUserShape(data.user) });
+        return { otpRequired: true, email: data.email };
       }
 
+      // skipOTP account — token already set, proceed directly
       const normalizedUser = normalizeUserShape(data.user);
       setUser(normalizedUser);
       localStorage.setItem('sanjeevni_user', JSON.stringify(normalizedUser));
-      console.log('Login successful for:', normalizedUser.email);
       return { user: normalizedUser };
     } catch (error) {
       console.error('Login fetch error:', error);
@@ -105,9 +113,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-
   const register = async (formData) => {
-    console.log('--- Registering user via AuthContext ---');
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -115,21 +121,20 @@ export function AuthProvider({ children }) {
         body: JSON.stringify(formData),
       });
 
-      console.log('Register response status:', res.status);
-      
-      let data;
       const contentType = res.headers.get('content-type');
+      let data;
       if (contentType && contentType.includes('application/json')) {
         data = await res.json();
-        console.log('Register JSON data:', data);
       } else {
-        const text = await res.text();
-        console.error('Register non-JSON response:', text);
         throw new Error(`Server returned non-JSON response (${res.status})`);
       }
 
-      if (!res.ok) {
-        return { error: data.error || data.details || 'Registration failed' };
+      if (!res.ok) return { error: data.error || data.details || 'Registration failed' };
+
+      if (data.otpRequired) {
+        // Store pending OTP state — do not set user yet
+        setPendingOTP({ email: data.email, user: normalizeUserShape(data.user) });
+        return { otpRequired: true, email: data.email, user: normalizeUserShape(data.user) };
       }
 
       const normalizedUser = normalizeUserShape(data.user);
@@ -137,7 +142,51 @@ export function AuthProvider({ children }) {
       localStorage.setItem('sanjeevni_user', JSON.stringify(normalizedUser));
       return { user: normalizedUser };
     } catch (error) {
-      console.error('Registration fetch/logic error:', error);
+      console.error('Registration error:', error);
+      return { error: 'Network error: Please try again' };
+    }
+  };
+
+  const verifyOTP = async (otp, manualEmail = null) => {
+    const email = manualEmail || pendingOTP?.email;
+    if (!email) return { error: 'No pending verification' };
+
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) return { error: data.error || 'OTP verification failed' };
+
+      // OTP verified — set user and clear pending state
+      const normalizedUser = normalizeUserShape(data.user);
+      setUser(normalizedUser);
+      localStorage.setItem('sanjeevni_user', JSON.stringify(normalizedUser));
+      setPendingOTP(null);
+      setLoading(false); 
+      return { user: normalizedUser };
+    } catch (error) {
+      console.error('OTP verification error:', error);
+      return { error: 'Network error: Please try again' };
+    }
+  };
+
+  const resendOTP = async (manualEmail = null) => {
+    const email = manualEmail || pendingOTP?.email;
+    if (!email) return { error: 'No pending verification' };
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { error: data.error || 'Failed to resend OTP' };
+      return { success: true };
+    } catch {
       return { error: 'Network error: Please try again' };
     }
   };
@@ -157,16 +206,25 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    if (session) {
-      await nextAuthSignOut({ redirect: false });
-    }
+    if (session) await nextAuthSignOut({ redirect: false });
     await fetch('/api/auth/logout', { method: 'POST' });
     localStorage.removeItem('sanjeevni_user');
+    setPendingOTP(null);
     window.location.href = '/';
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading: loading || status === 'loading', login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{
+      user,
+      loading: (user || pendingOTP) ? false : (loading || status === 'loading'),
+      pendingOTP,
+      login,
+      register,
+      verifyOTP,
+      resendOTP,
+      logout,
+      refreshUser,
+    }}>
       {children}
     </AuthContext.Provider>
   );

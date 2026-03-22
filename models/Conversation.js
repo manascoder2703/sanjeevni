@@ -104,6 +104,19 @@ const ConversationSchema = new mongoose.Schema(
       type: [ConversationMessageSchema],
       default: [],
     },
+    // Set to true when the doctor deliberately deletes the conversation.
+    // syncPortalConversationsForUser will skip recreating it until the
+    // patient books a NEW confirmed appointment after deletedAt.
+    deletedByDoctor: {
+      type: Boolean,
+      default: false,
+    },
+    // Timestamp of when the doctor deleted the conversation.
+    // Used to determine if a new appointment was booked after deletion.
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

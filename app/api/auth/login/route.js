@@ -3,10 +3,10 @@ import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import { signToken } from '@/lib/auth';
 import { loginLimiter } from '@/lib/rateLimit';
+import { sendOTPEmail, generateOTP } from '@/lib/email';
 
 export async function POST(request) {
   try {
-    // Rate limiting — must happen before any DB calls
     const limit = loginLimiter(request);
     if (!limit.success) {
       const retryAfterSec = Math.ceil((limit.reset - Date.now()) / 1000);
@@ -39,14 +39,38 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    const token = signToken({ userId: user._id, role: user.role, name: user.name, email: user.email });
+    // Skip OTP for test accounts — issue token directly
+    if (user.skipOTP) {
+      const token = signToken({ userId: user._id, role: user.role, name: user.name, email: user.email });
+      const response = NextResponse.json({
+        message: 'Login successful',
+        user: { id: user._id, name: user.name, role: user.role, email: user.email },
+        otpRequired: false,
+      });
+      response.cookies.set('sanjeevni_token', token, { httpOnly: true, maxAge: 5 * 60 * 60, path: '/' });
+      return response;
+    }
 
-    const response = NextResponse.json({
-      message: 'Login successful',
+    // Generate OTP and save to user
+    const otp = generateOTP();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    await User.updateOne({ _id: user._id }, { $set: { otp, otpExpiry } });
+
+    // Send OTP email
+    try {
+      await sendOTPEmail(user.email, otp, user.name);
+    } catch (emailErr) {
+      console.error('OTP email failed:', emailErr.message);
+      return NextResponse.json({ error: 'Failed to send OTP. Please try again.' }, { status: 500 });
+    }
+
+    // Return partial response — no token yet, OTP required
+    return NextResponse.json({
+      message: 'OTP sent to your email',
+      otpRequired: true,
+      email: user.email,
       user: { id: user._id, name: user.name, role: user.role, email: user.email },
     });
-    response.cookies.set('sanjeevni_token', token, { httpOnly: true, maxAge: 5 * 60 * 60, path: '/' });
-    return response;
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });

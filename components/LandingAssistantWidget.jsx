@@ -24,6 +24,17 @@ export default function LandingAssistantWidget() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
+  const [hasAutoOpened, setHasAutoOpened] = useState(false);
+
+  useEffect(() => {
+    if (!hasAutoOpened) {
+      const timer = setTimeout(() => {
+        setIsOpen(true);
+        setHasAutoOpened(true);
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [hasAutoOpened]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({

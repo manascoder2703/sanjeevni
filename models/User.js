@@ -11,13 +11,22 @@ const UserSchema = new mongoose.Schema(
     phone: { type: String, default: '' },
     // Patient profile fields
     dob: { type: Date },
-    gender: { type: String, enum: ['male', 'female', 'other', ''] , default: '' },
+    gender: { type: String, enum: ['male', 'female', 'other', ''], default: '' },
     bloodGroup: { type: String, default: '' },
     address: { type: String, default: '' },
     allergies: { type: String, default: '' },
+    currentMedications: { type: [String], default: [] },
+    conditions: { type: [String], default: [] },
+    weight: { type: String, default: '' },
     // Auth/security
     resetPasswordToken: String,
     resetPasswordExpire: Date,
+    // OTP verification
+    otp: { type: String, default: null },
+    otpExpiry: { type: Date, default: null },
+    isVerified: { type: Boolean, default: false },
+    // Set to true for test accounts to bypass OTP
+    skipOTP: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

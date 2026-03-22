@@ -40,6 +40,9 @@ export function NotificationProvider({ children }) {
 
     newSocket.on('connect', () => {
       newSocket.emit('identify', { userId: normalizedUserId });
+      if (user?.role === 'doctor') {
+        newSocket.emit('doctor-online', { userId: normalizedUserId });
+      }
     });
 
     newSocket.on('new-notification', (notification) => {
@@ -85,7 +88,8 @@ export function NotificationProvider({ children }) {
       markAllAsRead, 
       clearNotifications,
       lastRatingUpdate,
-      lastLockExpiry
+      lastLockExpiry,
+      socket
     }}>
       {children}
     </NotificationContext.Provider>

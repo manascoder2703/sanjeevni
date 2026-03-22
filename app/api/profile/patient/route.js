@@ -27,13 +27,18 @@ export async function PUT(request) {
     await connectDB();
     const body = await request.json();
 
-    const allowedFields = ['name', 'phone', 'dob', 'gender', 'bloodGroup', 'address', 'allergies', 'avatar'];
+    const allowedFields = [
+      'name', 'phone', 'dob', 'gender', 'bloodGroup',
+      'address', 'allergies', 'avatar',
+      // Health info fields for prescription system
+      'currentMedications', 'conditions', 'weight',
+    ];
+
     const updates = {};
     for (const field of allowedFields) {
       if (body[field] !== undefined) updates[field] = body[field];
     }
 
-    // Validate avatar size (base64 ~1.3x file size; cap at ~1.5MB stored)
     if (updates.avatar && updates.avatar.length > 2 * 1024 * 1024) {
       return NextResponse.json({ error: 'Avatar image too large. Please use an image under 1.5 MB.' }, { status: 400 });
     }

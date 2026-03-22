@@ -9,8 +9,8 @@ import {
   Star, AlertCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import io from 'socket.io-client';
 import { getCallWindowStatus, secondsUntilWindow } from '@/lib/callWindow';
+import { useNotifications } from '@/context/NotificationContext';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -142,6 +142,7 @@ function TodayRow({ apt, onAccept, onReject, onDone, onSummary }) {
 
 export default function DoctorDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const { socket } = useNotifications();
   const router = useRouter();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading]           = useState(true);
@@ -175,18 +176,27 @@ export default function DoctorDashboard() {
     fetchAppointments();
     fetchProfile();
 
-    const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001');
-    socket.on('connect', () => {
+    if (!socket) return;
+
+    const handleConnect = () => {
       socket.emit('doctor-online', { userId: user.id });
       setIsOnline(true);
-    });
+    };
+
+    if (socket.connected) {
+      handleConnect();
+    }
+
+    socket.on('connect', handleConnect);
     socket.on('disconnect', () => setIsOnline(false));
+    socket.on('new-notification', fetchAppointments);
 
-    // Refresh appointments when new booking comes in
-    socket.on('new-notification', () => fetchAppointments());
-
-    return () => socket.disconnect();
-  }, [user, authLoading, fetchAppointments, fetchProfile]);
+    return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect');
+      socket.off('new-notification', fetchAppointments);
+    };
+  }, [user, authLoading, fetchAppointments, fetchProfile, socket]);
 
   const updateStatus = async (id, status) => {
     try {

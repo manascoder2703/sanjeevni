@@ -175,18 +175,26 @@ function Label({ children }) {
 function StepperInput({ value, onChange, min = 0, step = 1, placeholder }) {
   return (
     <div style={{ position:'relative', display:'flex', alignItems:'center' }}>
-      <input {...inp({ paddingRight:'32px', background:'transparent' })} type="number" min={min} value={value}
-        onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+      <input {...inp({ paddingRight:'32px', background:'transparent' })} 
+         type="text"
+  inputMode="numeric" 
+        value={value}
+        onChange={e => {
+  console.log('raw input value:', e.target.value, 'parsed:', Math.round(Number(e.target.value)));
+  onChange(e.target.value === '' ? '' : String(Math.round(Number(e.target.value))));
+}} 
+        placeholder={placeholder} 
+      />
       <div style={{ position:'absolute', right:'8px', display:'flex', flexDirection:'column', gap:'1px' }}>
         <button type="button"
-          onClick={() => onChange(String(Number(value || 0) + step))}
+          onClick={() => onChange(String(Math.round(parseInt(value || 0, 10) + step)))}
           style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.2)', padding:'1px', display:'flex', lineHeight:1, transition:'color 0.1s' }}
           onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
           onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}>
           <ChevronUp size={12} />
         </button>
         <button type="button"
-          onClick={() => onChange(String(Math.max(min, Number(value || 0) - step)))}
+          onClick={() => onChange(String(Math.max(min, Math.round(parseInt(value || 0, 10) - step))))}
           style={{ background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.2)', padding:'1px', display:'flex', lineHeight:1, transition:'color 0.1s' }}
           onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
           onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.2)'}>
@@ -238,7 +246,8 @@ export default function DoctorProfile() {
           setForm({
             name: u.name || '', phone: u.phone || '', avatar: u.avatar || '', gender: u.gender || '',
             specialization: d.specialization || '', bio: d.bio || '',
-            fee: d.fee || '', experience: d.experience || '',
+           fee: d.fee != null ? String(Math.round(d.fee)) : '',
+          experience: d.experience != null ? String(Math.round(d.experience)) : '',
             hospital: d.hospital || '', clinicAddress: d.clinicAddress || '',
             qualifications: d.qualifications || [],
             languages: d.languages?.length ? d.languages : ['English'],
@@ -287,7 +296,7 @@ export default function DoctorProfile() {
       const res = await fetch('/api/profile/doctor', {
         method: 'PUT', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, fee: Number(form.fee), experience: Number(form.experience) }),
+        body: JSON.stringify({ ...form, fee: parseInt(form.fee, 10) || 0, experience: parseInt(form.experience, 10) || 0 }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save');

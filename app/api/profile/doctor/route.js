@@ -28,8 +28,8 @@ export async function PUT(request) {
     if (!decoded) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     await connectDB();
+    
     const body = await request.json();
-
     // Validate avatar size
     if (body.avatar && body.avatar.length > 2 * 1024 * 1024) {
       return NextResponse.json({ error: 'Avatar image too large. Please use an image under 1.5 MB.' }, { status: 400 });
@@ -51,7 +51,11 @@ export async function PUT(request) {
     const doctorFields = ['specialization', 'bio', 'fee', 'experience', 'hospital', 'clinicAddress', 'qualifications', 'languages', 'consultationType'];
     const doctorUpdates = {};
     for (const f of doctorFields) {
-      if (body[f] !== undefined) doctorUpdates[f] = body[f];
+      if (body[f] !== undefined) {
+  doctorUpdates[f] = (f === 'fee' || f === 'experience')
+    ? Math.round(Number(body[f]) || 0)
+    : body[f];
+}
     }
     const doctor = await Doctor.findOneAndUpdate(
       { userId: decoded.userId },
@@ -61,7 +65,7 @@ export async function PUT(request) {
 
     return NextResponse.json({ message: 'Profile updated successfully', user, doctor });
   } catch (error) {
-    console.error('PUT doctor profile error:', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    console.error('PUT doctor profile error:', error.message, error.stack);
+    return NextResponse.json({ error: error.message || 'Server error' }, { status: 500 });
   }
 }

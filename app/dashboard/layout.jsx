@@ -17,33 +17,40 @@ import {
 } from "@/components/ui/sidebar"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import CommandPalette from "@/components/CommandPalette"
 import { NotificationProvider } from "@/context/NotificationContext"
 import NotificationBell from "@/components/NotificationBell"
-
 
 export default function DashboardLayout({ children }) {
   const { user, loading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [isReady, setIsReady] = useState(false)
+
   const isChatPage =
     pathname === "/dashboard/doctor/chat" ||
     pathname === "/dashboard/patient/chat" ||
     pathname === "/dashboard/patient/ai-assistant"
 
   useEffect(() => {
+    // Only proceed once loading from context is finished
     if (!loading) {
-      if (!user) {
-        router.push("/login")
+      if (user) {
+        setIsReady(true);
       } else {
-        setIsReady(true)
+        // Double check: if no user is found after loading, go to login
+        const timeout = setTimeout(() => {
+          if (!user) router.push("/login");
+        }, 500);
+        return () => clearTimeout(timeout);
       }
     }
-  }, [user, loading, router])
+  }, [user, loading, router]);
 
-  if (loading || !isReady) {
+
+  // Only show loading if we are truly loading and don't have a user yet
+  if ((loading || !isReady) && !user) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[#000000]">
         <div className="flex flex-col items-center gap-4">
@@ -54,18 +61,14 @@ export default function DashboardLayout({ children }) {
     )
   }
 
-  // Refined breadcrumb logic
   const pathSegments = pathname.split('/').filter(Boolean)
-  // Skip the 'dashboard' segment if it's at the start to avoid redundancy
   const filteredSegments = pathSegments[0] === 'dashboard' ? pathSegments.slice(1) : pathSegments
 
   const breadcrumbs = filteredSegments.map((segment, index) => {
-    // Reconstruct the full path
     const actualIndex = pathSegments.indexOf(segment)
     const href = `/${pathSegments.slice(0, actualIndex + 1).join('/')}`
     const label = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, ' ')
     const isLast = index === filteredSegments.length - 1
-
     return { label, href, isLast }
   })
 
@@ -75,7 +78,6 @@ export default function DashboardLayout({ children }) {
         <CommandPalette />
         <AppSidebar />
         <SidebarInset className="bg-[#000000] text-white relative overflow-hidden flex flex-col min-h-screen">
-          {/* Unified Background Decor (Shared across all pages) */}
           <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-0"
             style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
           <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-blue-500/5 blur-[120px] pointer-events-none z-0"></div>
@@ -117,7 +119,7 @@ export default function DashboardLayout({ children }) {
             </div>
           </header>
 
-          <div 
+          <div
             className={`flex-1 relative z-10 custom-scrollbar flex flex-col min-h-0 ${isChatPage ? "items-stretch overflow-hidden" : "items-center overflow-y-auto"}`}
             style={{
               paddingLeft: isChatPage ? '0' : '2.5rem',
