@@ -9,8 +9,20 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
+    origin: function(origin, callback) {
+      const allowed = [
+        'http://localhost:3000',
+        process.env.CLIENT_URL,
+      ].filter(Boolean);
+      if (!origin || allowed.some(o => origin.startsWith(o))) {
+        callback(null, true);
+      } else {
+        console.warn(`⚠️  CORS blocked origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 

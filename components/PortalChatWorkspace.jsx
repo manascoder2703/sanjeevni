@@ -620,7 +620,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
                     {selectedConversation.latestAppointmentStatus === 'confirmed' && selectedConversation.latestRoomId ? (
                       <button 
                         type="button" 
-                        onClick={() => initiateCall(selectedConversation.counterpart, { id: selectedConversation.counterpart.id, name: selectedConversation.counterpart.name }, selectedConversation.latestRoomId)} 
+                        onClick={() => initiateCall({ id: selectedConversation.counterpart.id, name: selectedConversation.counterpart.name }, selectedConversation.latestRoomId)} 
                         className="action-btn" 
                         disabled={callState !== 'idle'}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.88)', fontSize: 16, cursor: 'pointer' }}
