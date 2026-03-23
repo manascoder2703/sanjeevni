@@ -7,7 +7,12 @@ import {
   PhoneOutgoing, 
   PhoneMissed, 
   Search, 
-  Phone
+  Phone,
+  RefreshCcw,
+  Clock3,
+  CheckCircle2,
+  XCircle,
+  ArrowUpDown
 } from 'lucide-react';
 import { useCall } from '@/context/CallContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,32 +23,44 @@ const DANGER = '#EF4444'; // Red for Missed
 const INFO = '#3B82F6';   // Blue for Outgoing
 
 export default function CallLogsView({ role }) {
-  const { initiateCall } = useCall();
+  const { initiateCall, callState } = useCall();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All'); 
   const [search, setSearch] = useState('');
+  const [sortOrder, setSortOrder] = useState('latest');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchLogs = async (silent = false) => {
+    if (!silent) setLoading(true);
+    if (silent) setRefreshing(true);
+    try {
+      const res = await fetch('/api/calls', { cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to load call logs');
+      setLogs(Array.isArray(data) ? data : []);
+    } catch (err) {
+      toast.error('Failed to load call logs');
+      console.error(err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const res = await fetch('/api/calls');
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        setLogs(data);
-      } catch (err) {
-        toast.error('Failed to load call logs');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchLogs();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredLogs = useMemo(() => {
-    return logs.filter(log => {
-      const matchesSearch = log.otherUser.name.toLowerCase().includes(search.toLowerCase());
+    const normalizedSearch = search.trim().toLowerCase();
+    const next = logs.filter((log) => {
+      const name = log?.otherUser?.name || 'Unknown User';
+      const specialty = log?.otherUser?.specialty || '';
+      const matchesSearch =
+        !normalizedSearch ||
+        name.toLowerCase().includes(normalizedSearch) ||
+        specialty.toLowerCase().includes(normalizedSearch);
       const matchesFilter = 
         filter === 'All' || 
         (filter === 'Incoming' && log.direction === 'incoming') ||
@@ -51,7 +68,12 @@ export default function CallLogsView({ role }) {
         (filter === 'Missed' && (log.status === 'missed' || log.status === 'rejected' || log.status === 'declined'));
       return matchesSearch && matchesFilter;
     });
-  }, [logs, search, filter]);
+    return [...next].sort((a, b) => {
+      const aTime = new Date(a?.createdAt || 0).getTime();
+      const bTime = new Date(b?.createdAt || 0).getTime();
+      return sortOrder === 'latest' ? bTime - aTime : aTime - bTime;
+    });
+  }, [logs, search, filter, sortOrder]);
 
   const stats = useMemo(() => {
     const total = filteredLogs.length;
@@ -112,24 +134,34 @@ export default function CallLogsView({ role }) {
   return (
     <div className="w-full max-w-6xl mx-auto space-y-10 py-10 px-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header Info */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <h1 className="text-sm font-black tracking-[0.3em] text-white/20 uppercase">
           {role === 'doctor' ? 'Doctor Portal' : 'Patient Portal'}
         </h1>
-        <h2 className="text-5xl font-black text-white tracking-tighter">Call logs</h2>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2 className="text-5xl font-black text-white tracking-tighter">Call logs</h2>
+          <button
+            onClick={() => fetchLogs(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-white/80 transition hover:bg-white/10 disabled:opacity-50"
+          >
+            <RefreshCcw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
         <p className="text-lg text-white/40 font-medium">History of all audio consultations with your {role === 'doctor' ? 'patients' : 'doctors'}.</p>
       </div>
 
       {/* Stats Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard value={stats.total} label="Total calls" />
-        <StatCard value={stats.completed} label="Completed" color={ACCENT} glowColor={ACCENT} />
-        <StatCard value={stats.missed} label="Missed" color={DANGER} glowColor={DANGER} />
-        <StatCard value={stats.totalMins > 0 ? `${stats.totalMins}m` : '--'} label="Total talk time" />
+        <StatCard value={stats.total} label="Total calls" icon={PhoneCall} />
+        <StatCard value={stats.completed} label="Completed" color={ACCENT} glowColor={ACCENT} icon={CheckCircle2} />
+        <StatCard value={stats.missed} label="Missed" color={DANGER} glowColor={DANGER} icon={XCircle} />
+        <StatCard value={stats.totalMins > 0 ? `${stats.totalMins}m` : '--'} label="Total talk time" icon={Clock3} />
       </div>
 
       {/* Filters & Search */}
-      <div className="flex flex-col lg:flex-row gap-6 justify-between items-center py-6 border-y border-white/5 backdrop-blur-sm sticky top-0 z-20">
+      <div className="flex flex-col lg:flex-row gap-4 justify-between items-center py-6 border-y border-white/5 backdrop-blur-sm sticky top-0 z-20">
         <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10 w-full lg:w-auto overflow-x-auto no-scrollbar">
           {['All', 'Incoming', 'Outgoing', 'Missed'].map(tab => (
             <button
@@ -149,16 +181,25 @@ export default function CallLogsView({ role }) {
           ))}
         </div>
 
-        <div className="relative w-full lg:w-[400px] group">
-          <div className="absolute inset-0 bg-white/5 blur-xl group-focus-within:bg-white/10 transition-all duration-500 rounded-2xl" />
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 size-5 text-white/30 group-focus-within:text-white/60 transition-colors" />
-          <input
-            type="text"
-            placeholder="Search by name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="relative w-full bg-[#0A0A0A]/80 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all font-bold tracking-tight text-lg"
-          />
+        <div className="flex w-full lg:w-auto items-center gap-3">
+          <button
+            onClick={() => setSortOrder((prev) => (prev === 'latest' ? 'oldest' : 'latest'))}
+            className="inline-flex h-[58px] shrink-0 items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 text-xs font-black uppercase tracking-[0.2em] text-white/70 transition hover:bg-white/10"
+          >
+            <ArrowUpDown className="size-4" />
+            {sortOrder === 'latest' ? 'Latest' : 'Oldest'}
+          </button>
+          <div className="relative w-full lg:w-[360px] group">
+            <div className="absolute inset-0 bg-white/5 blur-xl group-focus-within:bg-white/10 transition-all duration-500 rounded-2xl" />
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 size-5 text-white/30 group-focus-within:text-white/60 transition-colors" />
+            <input
+              type="text"
+              placeholder="Search by name or specialty..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="relative w-full bg-[#0A0A0A]/80 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all font-bold tracking-tight text-lg"
+            />
+          </div>
         </div>
       </div>
 
@@ -200,7 +241,17 @@ export default function CallLogsView({ role }) {
                     <CallLogRow 
                       key={log._id} 
                       log={log} 
-                      onCall={() => initiateCall(log.otherUser, log.conversationId)} 
+                      onCall={() => {
+                        if (callState !== 'idle') {
+                          toast.error('You are already in a call');
+                          return;
+                        }
+                        if (!log?.conversationId || !log?.otherUser?.id) {
+                          toast.error('This call cannot be started from logs');
+                          return;
+                        }
+                        initiateCall(log.otherUser, log.conversationId);
+                      }} 
                     />
                   ))}
                 </div>
@@ -213,7 +264,7 @@ export default function CallLogsView({ role }) {
   );
 }
 
-function StatCard({ value, label, color = 'white', glowColor }) {
+function StatCard({ value, label, color = 'white', glowColor, icon: Icon }) {
   return (
     <motion.div 
       whileHover={{ y: -5, backgroundColor: 'rgba(255,255,255,0.08)' }}
@@ -226,6 +277,9 @@ function StatCard({ value, label, color = 'white', glowColor }) {
         />
       )}
       <div className="relative z-10">
+        <div className="mb-3 inline-flex rounded-xl border border-white/10 bg-black/20 p-2 text-white/70">
+          {Icon ? <Icon className="size-4" /> : <Phone className="size-4" />}
+        </div>
         <div className="text-5xl font-black mb-2 transition-all tracking-tighter" style={{ color }}>
           {value}
         </div>
@@ -240,6 +294,7 @@ function StatCard({ value, label, color = 'white', glowColor }) {
 function CallLogRow({ log, onCall }) {
   const isCompleted = log.status === 'completed';
   const isIncoming = log.direction === 'incoming';
+  const canCall = Boolean(log?.conversationId && log?.otherUser?.id);
   
   let arrowColor = INFO; 
   if (!isCompleted) arrowColor = DANGER;
@@ -284,7 +339,7 @@ function CallLogRow({ log, onCall }) {
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-3 mb-1">
-          <h4 className="text-xl font-black text-white tracking-tight truncate">{log.otherUser.name}</h4>
+          <h4 className="text-xl font-black text-white tracking-tight truncate">{log?.otherUser?.name || 'Unknown User'}</h4>
           <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] ${
             isCompleted 
               ? 'bg-white/10 text-white/60' 
@@ -294,7 +349,7 @@ function CallLogRow({ log, onCall }) {
           </span>
         </div>
         <div className="flex items-center gap-2 text-white/30 font-bold text-xs uppercase tracking-widest">
-          <span className="text-white/50">{log.otherUser.specialty}</span>
+          <span className="text-white/50">{log?.otherUser?.specialty || (isIncoming ? 'Incoming' : 'Outgoing')}</span>
           <span className="size-1 rounded-full bg-white/10" />
           <span>{log.direction}</span>
         </div>
@@ -316,10 +371,11 @@ function CallLogRow({ log, onCall }) {
           whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,1)', color: 'black' }}
           whileTap={{ scale: 0.95 }}
           onClick={onCall}
-          className="flex items-center gap-3 px-6 py-3.5 rounded-2xl border border-white/10 bg-white/5 text-white transition-all text-sm font-black uppercase tracking-widest group/btn shadow-[0_0_20px_rgba(255,255,255,0)] hover:shadow-[0_0_20px_rgba(255,255,255,0.2)]"
+          disabled={!canCall}
+          className="flex items-center gap-3 px-6 py-3.5 rounded-2xl border border-white/10 bg-white/5 text-white transition-all text-sm font-black uppercase tracking-widest group/btn shadow-[0_0_20px_rgba(255,255,255,0)] hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <PhoneCall size={18} />
-          <span className="hidden md:inline">Call again</span>
+          <span className="hidden md:inline">{canCall ? 'Call again' : 'Unavailable'}</span>
         </motion.button>
       </div>
     </motion.div>
