@@ -14,6 +14,7 @@ import {
   FileText,
   ClipboardList,
   HeartPulse,
+  PhoneCall,
 } from "lucide-react"
 
 import Link from "next/link"
@@ -42,6 +43,7 @@ const data = {
           { title: "Find Doctors",        url: "/dashboard/patient/doctors",          icon: Stethoscope },
           { title: "Sanjeevni AI",        url: "/dashboard/patient/ai-assistant",     icon: Bot },
           { title: "Chat with Doctor",    url: "/dashboard/patient/chat",             icon: MessageSquare },
+          { title: "Call Logs",           url: "/dashboard/patient/calls",            icon: PhoneCall },
           { title: "My Prescriptions",   url: "/dashboard/patient/prescriptions",    icon: FileText },
           { title: "Health Info", url: "/dashboard/patient/health-info", icon: HeartPulse },
         ],
@@ -59,6 +61,7 @@ const data = {
         items: [
           { title: "Dashboard",         url: "/dashboard/doctor",                 icon: LayoutDashboard },
           { title: "Chat with Patient", url: "/dashboard/doctor/chat",            icon: MessageSquare },
+          { title: "Call Logs",         url: "/dashboard/doctor/calls",           icon: PhoneCall },
           { title: "Prescriptions",     url: "/dashboard/doctor/prescriptions",   icon: ClipboardList },
         ],
       },

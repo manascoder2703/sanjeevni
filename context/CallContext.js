@@ -46,7 +46,12 @@ export function CallProvider({ children }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ text, kind: 'call' }),
+        body: JSON.stringify({ 
+          text, 
+          kind: 'call',
+          callDuration: duration || 0,
+          callStatus: type === 'ended' ? 'completed' : type // 'missed', 'rejected'
+        }),
       });
     } catch (err) {
       console.error('Failed to log call:', err);

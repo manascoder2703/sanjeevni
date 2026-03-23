@@ -5,6 +5,7 @@ import { getUserFromRequest } from '@/lib/auth';
 import Conversation from '@/models/Conversation';
 import User from '@/models/User';
 import Doctor from '@/models/Doctor';
+import CallLog from '@/models/CallLog';
 import { emitChatMessage } from '@/lib/chatRealtime';
 import {
   getConversationAccessFilter,
@@ -21,7 +22,7 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { text = '', kind = 'text' } = await request.json();
+    const { text = '', kind = 'text', callDuration = 0, callStatus = 'completed' } = await request.json();
     const trimmedText = text.trim();
 
     if (!trimmedText) {
@@ -41,6 +42,27 @@ export async function POST(request, { params }) {
     const createdAt = new Date();
     const messageId = new mongoose.Types.ObjectId();
     const unreadField = user.role === 'doctor' ? 'patientUnreadCount' : 'doctorUnreadCount';
+
+    // Create Call Log if it's a call
+    if (kind === 'call') {
+      try {
+        await CallLog.create({
+          doctorUserId: conversation.doctorUserId,
+          patientUserId: conversation.patientUserId,
+          doctorProfileId: conversation.doctorProfileId,
+          initiatorId: user.userId,
+          initiatorRole: user.role,
+          status: callStatus,
+          duration: callDuration,
+          startTime: createdAt,
+          endTime: new Date(createdAt.getTime() + (callDuration * 1000)),
+          conversationId: conversationId
+        });
+      } catch (logError) {
+        console.error('Failed to create CallLog:', logError);
+        // We continue anyway so the message is sent
+      }
+    }
 
     await Conversation.updateOne(accessFilter, {
       $push: {
