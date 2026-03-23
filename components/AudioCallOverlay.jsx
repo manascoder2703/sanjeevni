@@ -11,12 +11,13 @@ const DANGER = '#ef4444';
 export default function AudioCallOverlay() {
   const { 
     callState, isIncoming, remoteUser, isMuted,
+    isMinimized, setIsMinimized,
     acceptCall, rejectCall, hangupCall, toggleMute 
   } = useCall();
 
   const [timer, setTimer] = useState(0);
 
-  // --- Ringtone Synth ---
+  // --- Ringtone Synth (same as before) ---
   useEffect(() => {
     let audioCtx;
     let oscillator;
@@ -24,33 +25,22 @@ export default function AudioCallOverlay() {
     let timeoutId;
 
     const playTone = () => {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       oscillator = audioCtx.createOscillator();
       gainNode = audioCtx.createGain();
-
       oscillator.type = 'sine';
       oscillator.frequency.setValueAtTime(480, audioCtx.currentTime); 
-      
       gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
       gainNode.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 0.05);
       gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
-
       oscillator.connect(gainNode);
       gainNode.connect(audioCtx.destination);
-
       oscillator.start();
       oscillator.stop(audioCtx.currentTime + 0.5);
-
-      timeoutId = setTimeout(playTone, 1500); // Repeat pattern
+      timeoutId = setTimeout(playTone, 1500);
     };
 
-    if (callState === 'ringing' && isIncoming) {
-      playTone();
-    }
-
+    if (callState === 'ringing' && isIncoming) playTone();
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
       if (audioCtx) audioCtx.close();
@@ -76,6 +66,67 @@ export default function AudioCallOverlay() {
   if (callState === 'idle') return null;
 
   const initials = (name = '') => name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+  // --- Minimized Bar UI ---
+  if (isMinimized && callState === 'connected') {
+    return (
+      <motion.div
+        initial={{ y: 100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 100, opacity: 0 }}
+        style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          zIndex: 9999,
+          background: 'rgba(17, 24, 39, 0.95)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: 24,
+          padding: '12px 20px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          color: 'white',
+          cursor: 'pointer'
+        }}
+        onClick={() => setIsMinimized(false)}
+      >
+        <div style={{
+          width: 44,
+          height: 44,
+          borderRadius: '50%',
+          background: `linear-gradient(135deg, ${ACCENT}, #3b82f6)`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 14,
+          fontWeight: 800
+        }}>
+          {initials(remoteUser?.name)}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>{remoteUser?.name}</div>
+          <div style={{ fontSize: 12, color: ACCENT }}>{formatTimer(timer)}</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }} onClick={e => e.stopPropagation()}>
+          <button 
+            onClick={toggleMute}
+            style={{ padding: 10, borderRadius: 12, border: 'none', background: 'rgba(255,255,255,0.05)', color: 'white', cursor: 'pointer' }}
+          >
+            {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
+          </button>
+          <button 
+            onClick={hangupCall}
+            style={{ padding: 10, borderRadius: 12, border: 'none', background: DANGER, color: 'white', cursor: 'pointer' }}
+          >
+            <PhoneOff size={18} />
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <AnimatePresence>
@@ -109,9 +160,34 @@ export default function AudioCallOverlay() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            textAlign: 'center'
+            textAlign: 'center',
+            position: 'relative'
           }}
         >
+          {/* Minimize Button */}
+          {callState === 'connected' && (
+            <button
+              onClick={() => setIsMinimized(true)}
+              style={{
+                position: 'absolute',
+                top: 24,
+                right: 24,
+                width: 40,
+                height: 40,
+                borderRadius: '50%',
+                border: 'none',
+                background: 'rgba(255,255,255,0.05)',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <User size={20} />
+            </button>
+          )}
+
           {/* Avatar Area */}
           <div style={{ position: 'relative', marginBottom: 32 }}>
             <motion.div

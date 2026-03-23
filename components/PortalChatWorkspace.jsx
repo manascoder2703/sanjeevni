@@ -9,6 +9,7 @@ import {
   CalendarPlus,
   FileText,
   Paperclip,
+  Phone,
   PhoneCall,
   Search,
   Send,
@@ -501,6 +502,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
       <style>{`
         .chat-workspace { height:100%; min-height:0; width:100%; display:flex; }
         .chat-shell { display:grid; grid-template-columns:minmax(380px,500px) minmax(0,1fr); min-height:100%; height:100%; width:100%; overflow:hidden; background:linear-gradient(180deg,rgba(7,10,16,0.98),rgba(5,8,13,0.99)); }
+        .chat-scroll { scroll-behavior: smooth; }
         .chat-scroll::-webkit-scrollbar { width:8px; }
         .chat-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:999px; }
         .chat-tab { flex:1; padding:18px 20px; border:none; background:transparent; color:rgba(255,255,255,0.72); font-size:16px; border-bottom:3px solid transparent; cursor:pointer; }
@@ -671,9 +673,16 @@ export default function PortalChatWorkspace({ viewerRole }) {
                             </div>
                           )}
                           <div style={{ maxWidth: '72%' }} className={entry.message._optimistic ? 'msg-optimistic' : ''}>
-                            <div style={{ padding: '18px 22px', borderRadius: 22, background: entry.message.mine ? ACCENT : 'rgba(255,255,255,0.06)', color: 'white', fontSize: 18, lineHeight: 1.6, border: `1px solid ${entry.message.mine ? ACCENT : 'rgba(255,255,255,0.08)'}`, boxShadow: entry.message.mine ? '0 16px 36px rgba(24,182,162,0.16)' : 'none' }}>
-                              {entry.message.text}
-                            </div>
+                            {entry.message.kind === 'call' ? (
+                              <div style={{ padding: '12px 20px', borderRadius: 22, background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.7)', fontSize: 16, border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', gap: 12, fontStyle: 'italic' }}>
+                                <Phone size={18} style={{ color: ACCENT }} />
+                                {entry.message.text}
+                              </div>
+                            ) : (
+                              <div style={{ padding: '18px 22px', borderRadius: 22, background: entry.message.mine ? ACCENT : 'rgba(255,255,255,0.06)', color: 'white', fontSize: 18, lineHeight: 1.6, border: `1px solid ${entry.message.mine ? ACCENT : 'rgba(255,255,255,0.08)'}`, boxShadow: entry.message.mine ? '0 16px 36px rgba(24,182,162,0.16)' : 'none' }}>
+                                {entry.message.text}
+                              </div>
+                            )}
                             <div style={{ marginTop: 8, display: 'flex', justifyContent: entry.message.mine ? 'flex-end' : 'flex-start', gap: 6, color: 'rgba(255,255,255,0.56)', fontSize: 14 }}>
                               <span>{messageTime(entry.message.createdAt)}</span>
                               {entry.message.mine && (

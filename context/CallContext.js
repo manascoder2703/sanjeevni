@@ -18,9 +18,40 @@ export function CallProvider({ children }) {
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [startTime, setStartTime] = useState(null);
 
   const pcRef = useRef(null);
   const audioRef = useRef(null);
+
+  const logCall = useCallback(async (type, duration = null) => {
+    if (!roomId || !stateRef.current.remoteUser) return;
+    
+    let text = '';
+    if (type === 'ended') {
+      const mins = Math.floor(duration / 60);
+      const secs = duration % 60;
+      const durationStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      text = `Call ended • ${durationStr}`;
+    } else if (type === 'missed') {
+      text = isIncoming ? 'Missed call' : 'Call not answered';
+    } else if (type === 'rejected') {
+      text = isIncoming ? 'Call rejected' : 'Call declined';
+    }
+
+    if (!text) return;
+
+    try {
+      await fetch(`/api/chat/conversations/${roomId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ text, kind: 'call' }),
+      });
+    } catch (err) {
+      console.error('Failed to log call:', err);
+    }
+  }, [roomId, isIncoming]);
 
   // Update audio source when remote stream changes
   useEffect(() => {
@@ -38,7 +69,18 @@ export function CallProvider({ children }) {
   }, [remoteStream]);
 
   // Clean up WebRTC
-  const cleanup = useCallback(() => {
+  const cleanup = useCallback((reason = 'ended') => {
+    // Log call before clearing state
+    const curState = stateRef.current.callState;
+    const curStart = stateRef.current.startTime;
+
+    if (curState === 'connected' && curStart) {
+      const duration = Math.floor((Date.now() - curStart) / 1000);
+      logCall('ended', duration);
+    } else if (curState === 'ringing' || curState === 'offering') {
+      logCall(reason === 'rejected' ? 'rejected' : 'missed');
+    }
+
     if (pcRef.current) {
       pcRef.current.close();
       pcRef.current = null;
@@ -53,7 +95,9 @@ export function CallProvider({ children }) {
     setRemoteUser(null);
     setRoomId(null);
     setIsMuted(false);
-  }, [localStream]);
+    setIsMinimized(false);
+    setStartTime(null);
+  }, [localStream, logCall]);
 
   // Initialize WebRTC PeerConnection
   const createPC = useCallback((stream) => {
@@ -105,12 +149,12 @@ export function CallProvider({ children }) {
 
     pcRef.current = pc;
     return pc;
-  }, [roomId, cleanup]);
+  }, [socket, cleanup]);
 
-  const stateRef = useRef({ callState, roomId, localStream, remoteUser });
+  const stateRef = useRef({ callState, roomId, localStream, remoteUser, startTime });
   useEffect(() => {
-    stateRef.current = { callState, roomId, localStream, remoteUser };
-  }, [callState, roomId, localStream, remoteUser]);
+    stateRef.current = { callState, roomId, localStream, remoteUser, startTime };
+  }, [callState, roomId, localStream, remoteUser, startTime]);
 
   // Handle Signaling
   useEffect(() => {
@@ -131,6 +175,7 @@ export function CallProvider({ children }) {
     const handleAccepted = async ({ roomId: rId }) => {
       console.log('✅ Call accepted signal received');
       if (stateRef.current.callState !== 'offering') return;
+      setStartTime(Date.now());
       setCallState('connected');
       toast.success('Call accepted');
     };
@@ -186,8 +231,8 @@ export function CallProvider({ children }) {
     socket.on('call:incoming', handleIncoming);
     socket.on('call:accepted', handleAccepted);
     socket.on('user-joined', handleUserJoined);
-    socket.on('call:rejected', () => { toast.error('Call rejected'); cleanup(); });
-    socket.on('call:hangup', () => cleanup());
+    socket.on('call:rejected', () => { toast.error('Call rejected'); cleanup('rejected'); });
+    socket.on('call:hangup', () => cleanup('ended'));
     socket.on('offer', handleOffer);
     socket.on('answer', handleAnswer);
     socket.on('ice-candidate', handleIce);
@@ -233,6 +278,7 @@ export function CallProvider({ children }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       setLocalStream(stream);
+      setStartTime(Date.now());
       setCallState('connected');
       
       socket.emit('call:accepted', { toUserId: remoteUser.id, roomId });
@@ -251,7 +297,7 @@ export function CallProvider({ children }) {
     if (remoteUser && roomId) {
       socket.emit('call:rejected', { toUserId: remoteUser.id, roomId });
     }
-    cleanup();
+    cleanup('rejected');
   };
 
   const hangupCall = () => {
@@ -259,7 +305,7 @@ export function CallProvider({ children }) {
     if (remoteUser && roomId) {
       socket.emit('call:hangup', { toUserId: remoteUser.id, roomId });
     }
-    cleanup();
+    cleanup('ended');
   };
 
   const toggleMute = () => {
@@ -275,6 +321,7 @@ export function CallProvider({ children }) {
   return (
     <CallContext.Provider value={{
       callState, isIncoming, remoteUser, localStream, remoteStream, isMuted,
+      isMinimized, setIsMinimized,
       initiateCall, acceptCall, rejectCall, hangupCall, toggleMute
     }}>
       {children}

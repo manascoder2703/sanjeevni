@@ -19,7 +19,7 @@ const ConversationMessageSchema = new mongoose.Schema(
     },
     kind: {
       type: String,
-      enum: ['text', 'quick-action'],
+      enum: ['text', 'quick-action', 'call'],
       default: 'text',
     },
     deliveredAt: {
