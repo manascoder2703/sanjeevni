@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import { getUserFromRequest } from '@/lib/auth';
 import Conversation from '@/models/Conversation';
+import User from '@/models/User';
+import Doctor from '@/models/Doctor';
 import { emitChatMessage } from '@/lib/chatRealtime';
 import {
   getConversationAccessFilter,

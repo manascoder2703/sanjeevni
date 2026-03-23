@@ -150,9 +150,15 @@ export function CallProvider({ children }) {
 
     const handleOffer = async ({ offer }) => {
       const { localStream: curStream, roomId: curRoom } = stateRef.current;
-      console.log('📡 Received Offer, creating Answer...');
+      console.log('📡 Received Offer, signalingState:', pcRef.current?.signalingState);
       if (!curStream) return;
+      
       const pc = pcRef.current || createPC(curStream);
+      if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer') {
+          console.warn('⚠️ Received Offer in unexpected state:', pc.signalingState);
+          // if we already have a remote offer, this might be a collision or retry
+      }
+
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
@@ -160,9 +166,11 @@ export function CallProvider({ children }) {
     };
 
     const handleAnswer = async ({ answer }) => {
-      console.log('📡 Received Answer, setting remote description');
-      if (pcRef.current) {
+      console.log('📡 Received Answer, signalingState:', pcRef.current?.signalingState);
+      if (pcRef.current && pcRef.current.signalingState === 'have-local-offer') {
         await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
+      } else {
+        console.warn('⚠️ Received Answer but signalingState is NOT have-local-offer. Skipping.');
       }
     };
 
