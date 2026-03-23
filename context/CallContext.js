@@ -20,11 +20,27 @@ export function CallProvider({ children }) {
   const [isMuted, setIsMuted] = useState(false);
 
   const pcRef = useRef(null);
-  const socketRef = useRef(socket);
+  const audioRef = useRef(null);
 
+  // Initialize persistent audio element
   useEffect(() => {
-    socketRef.current = socket;
-  }, [socket]);
+    const audio = document.createElement('audio');
+    audio.autoplay = true;
+    audio.hidden = true;
+    document.body.appendChild(audio);
+    audioRef.current = audio;
+    return () => {
+      document.body.removeChild(audio);
+    };
+  }, []);
+
+  // Update audio source when remote stream changes
+  useEffect(() => {
+    if (audioRef.current && remoteStream) {
+      audioRef.current.srcObject = remoteStream;
+      audioRef.current.play().catch(err => console.warn('Autoplay blocked:', err));
+    }
+  }, [remoteStream]);
 
   // Clean up WebRTC
   const cleanup = useCallback(() => {
@@ -50,19 +66,28 @@ export function CallProvider({ children }) {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
       ],
     });
 
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     pc.onicecandidate = (e) => {
-      if (e.candidate && roomId) {
-        socketRef.current?.emit('ice-candidate', { roomId, candidate: e.candidate });
+      if (e.candidate && stateRef.current.roomId) {
+        socket.emit('ice-candidate', { roomId: stateRef.current.roomId, candidate: e.candidate });
       }
     };
 
     pc.ontrack = (e) => {
-      setRemoteStream(e.streams[0]);
+      console.log('📡 Remote track received:', e.track.kind);
+      if (e.streams && e.streams[0]) {
+        setRemoteStream(e.streams[0]);
+      } else {
+        const inboundStream = new MediaStream([e.track]);
+        setRemoteStream(inboundStream);
+      }
     };
 
     pc.onconnectionstatechange = () => {
@@ -75,13 +100,17 @@ export function CallProvider({ children }) {
     return pc;
   }, [roomId, cleanup]);
 
-  // Handle Incoming Call
+  const stateRef = useRef({ callState, roomId, localStream, remoteUser });
+  useEffect(() => {
+    stateRef.current = { callState, roomId, localStream, remoteUser };
+  }, [callState, roomId, localStream, remoteUser]);
+
+  // Handle Signaling
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('call:incoming', ({ callerName, callerId, roomId: rId }) => {
-      if (callState !== 'idle') {
-        // Busy - auto reject
+    const handleIncoming = ({ callerName, callerId, roomId: rId }) => {
+      if (stateRef.current.callState !== 'idle') {
         socket.emit('call:rejected', { toUserId: callerId, roomId: rId });
         return;
       }
@@ -89,68 +118,67 @@ export function CallProvider({ children }) {
       setRoomId(rId);
       setIsIncoming(true);
       setCallState('ringing');
-      
-      // Play ringtone logic could go here
-    });
+    };
 
-    socket.on('call:accepted', async ({ roomId: rId }) => {
-      if (callState !== 'offering') return;
+    const handleAccepted = async ({ roomId: rId }) => {
+      if (stateRef.current.callState !== 'offering') return;
       setCallState('connected');
       toast.success('Call accepted');
-    });
+    };
 
-    socket.on('user-joined', async ({ userName }) => {
-      // If we are the ones who initiated (state is connected/offering), start handshake
-      if (callState === 'connected' || callState === 'offering') {
-        if (!localStream) return;
-        const pc = pcRef.current || createPC(localStream);
+    const handleUserJoined = async () => {
+      const { callState: curState, localStream: curStream, roomId: curRoom } = stateRef.current;
+      if (curState === 'connected' || curState === 'offering') {
+        if (!curStream) return;
+        const pc = pcRef.current || createPC(curStream);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        socket.emit('offer', { roomId, offer });
+        socket.emit('offer', { roomId: curRoom, offer });
       }
-    });
+    };
 
-    socket.on('call:rejected', () => {
-      toast.error('Call rejected');
-      cleanup();
-    });
-
-    socket.on('call:hangup', () => {
-      cleanup();
-    });
-
-    // WebRTC Signaling
-    socket.on('offer', async ({ offer }) => {
-      if (!localStream) return;
-      const pc = pcRef.current || createPC(localStream);
+    const handleOffer = async ({ offer }) => {
+      const { localStream: curStream, roomId: curRoom } = stateRef.current;
+      if (!curStream) return;
+      const pc = pcRef.current || createPC(curStream);
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      socket.emit('answer', { roomId, answer });
-    });
+      socket.emit('answer', { roomId: curRoom, answer });
+    };
 
-    socket.on('answer', async ({ answer }) => {
+    const handleAnswer = async ({ answer }) => {
       if (pcRef.current) {
         await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
       }
-    });
+    };
 
-    socket.on('ice-candidate', async ({ candidate }) => {
+    const handleIce = async ({ candidate }) => {
       if (pcRef.current) {
         try { await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) {}
       }
-    });
+    };
+
+    socket.on('call:incoming', handleIncoming);
+    socket.on('call:accepted', handleAccepted);
+    socket.on('user-joined', handleUserJoined);
+    socket.on('call:rejected', () => { toast.error('Call rejected'); cleanup(); });
+    socket.on('call:hangup', () => cleanup());
+    socket.on('offer', handleOffer);
+    socket.on('answer', handleAnswer);
+    socket.on('ice-candidate', handleIce);
 
     return () => {
-      socket.off('call:incoming');
-      socket.off('call:accepted');
+      socket.off('call:incoming', handleIncoming);
+      socket.off('call:accepted', handleAccepted);
+      socket.off('user-joined', handleUserJoined);
       socket.off('call:rejected');
       socket.off('call:hangup');
-      socket.off('offer');
-      socket.off('answer');
-      socket.off('ice-candidate');
+      socket.off('offer', handleOffer);
+      socket.off('answer', handleAnswer);
+      socket.off('ice-candidate', handleIce);
     };
-  }, [socket, callState, localStream, roomId, createPC, cleanup]);
+  }, [socket, createPC, cleanup]);
 
   const initiateCall = async (targetUser, rId) => {
     try {
