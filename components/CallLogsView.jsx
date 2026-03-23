@@ -2,32 +2,26 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Phone, 
   PhoneCall, 
   PhoneIncoming, 
   PhoneOutgoing, 
   PhoneMissed, 
   Search, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  Clock, 
-  Calendar,
-  X,
-  PhoneOff
+  Phone
 } from 'lucide-react';
 import { useCall } from '@/context/CallContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
-const ACCENT = '#18B6A2';
-const DANGER = '#EF4444';
-const INFO = '#3B82F6';
+const ACCENT = '#18B6A2'; // Green for Incoming
+const DANGER = '#EF4444'; // Red for Missed
+const INFO = '#3B82F6';   // Blue for Outgoing
 
 export default function CallLogsView({ role }) {
   const { initiateCall } = useCall();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('All'); // 'All', 'Incoming', 'Outgoing', 'Missed'
+  const [filter, setFilter] = useState('All'); 
   const [search, setSearch] = useState('');
 
   useEffect(() => {
@@ -71,136 +65,175 @@ export default function CallLogsView({ role }) {
 
   const groupLogsByDate = (logsToGroup) => {
     const groups = {};
-    const today = new Date().toDateString();
-    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    const today = new Date();
+    const yesterday = new Date(Date.now() - 86400000);
+
+    const formatDate = (date) => {
+      return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase();
+    };
 
     logsToGroup.forEach(log => {
       const date = new Date(log.createdAt);
-      let dateStr = date.toDateString();
-      if (dateStr === today) dateStr = 'TODAY';
-      else if (dateStr === yesterday) dateStr = 'YESTERDAY';
-      else {
-        dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'SHORT' }).toUpperCase();
+      let dateKey = formatDate(date);
+      let dateStr = dateKey;
+
+      if (date.toDateString() === today.toDateString()) {
+        dateStr = 'TODAY';
+        dateKey = '0-TODAY';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        dateStr = 'YESTERDAY';
+        dateKey = '1-YESTERDAY';
+      } else {
+        dateKey = `2-${dateKey}`;
       }
 
-      if (!groups[dateStr]) groups[dateStr] = [];
-      groups[dateStr].push(log);
+      if (!groups[dateKey]) groups[dateKey] = { label: dateStr, logs: [] };
+      groups[dateKey].logs.push(log);
     });
-    return groups;
+
+    return Object.fromEntries(
+      Object.entries(groups).sort(([a], [b]) => a.localeCompare(b))
+    );
   };
 
   const groupedLogs = groupLogsByDate(filteredLogs);
 
-  const formatDuration = (s) => {
-    if (!s) return '---';
-    const mins = Math.floor(s / 60);
-    const secs = s % 60;
-    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
-  };
-
-  const formatTime = (dateStr) => {
-    return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
   if (loading) {
     return (
       <div className="flex h-96 w-full items-center justify-center">
-        <div className="size-10 animate-spin rounded-full border-4 border-white/10 border-t-white" />
+        <div className="size-16 relative">
+          <div className="absolute inset-0 rounded-full border-4 border-white/5" />
+          <div className="absolute inset-0 rounded-full border-4 border-t-white animate-spin" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
+    <div className="w-full max-w-6xl mx-auto space-y-10 py-10 px-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header Info */}
-      <div className="space-y-1">
-        <h1 className="text-4xl font-black tracking-tighter text-white uppercase opacity-10">
+      <div className="space-y-2">
+        <h1 className="text-sm font-black tracking-[0.3em] text-white/20 uppercase">
           {role === 'doctor' ? 'Doctor Portal' : 'Patient Portal'}
         </h1>
-        <h2 className="text-3xl font-bold text-white tracking-tight">Call logs</h2>
-        <p className="text-white/40">History of all audio consultations with your {role === 'doctor' ? 'patients' : 'doctors'}.</p>
+        <h2 className="text-5xl font-black text-white tracking-tighter">Call logs</h2>
+        <p className="text-lg text-white/40 font-medium">History of all audio consultations with your {role === 'doctor' ? 'patients' : 'doctors'}.</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Stats Cards Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard value={stats.total} label="Total calls" />
-        <StatCard value={stats.completed} label="Completed" color={ACCENT} />
-        <StatCard value={stats.missed} label="Missed" color={DANGER} />
-        <StatCard value={`${stats.totalMins}m`} label="Total talk time" />
+        <StatCard value={stats.completed} label="Completed" color={ACCENT} glowColor={ACCENT} />
+        <StatCard value={stats.missed} label="Missed" color={DANGER} glowColor={DANGER} />
+        <StatCard value={stats.totalMins > 0 ? `${stats.totalMins}m` : '--'} label="Total talk time" />
       </div>
 
       {/* Filters & Search */}
-      <div className="flex flex-col md:flex-row gap-4 justify-between items-center py-4">
-        <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
+      <div className="flex flex-col lg:flex-row gap-6 justify-between items-center py-6 border-y border-white/5 backdrop-blur-sm sticky top-0 z-20">
+        <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10 w-full lg:w-auto overflow-x-auto no-scrollbar">
           {['All', 'Incoming', 'Outgoing', 'Missed'].map(tab => (
             <button
               key={tab}
               onClick={() => setFilter(tab)}
-              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
+              className={`px-8 py-3 rounded-xl text-sm font-black tracking-wide transition-all duration-300 relative whitespace-nowrap ${
                 filter === tab 
-                  ? 'bg-white/10 text-white shadow-lg' 
-                  : 'text-white/40 hover:text-white/60'
+                  ? 'text-white bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.1)]' 
+                  : 'text-white/30 hover:text-white/60 hover:bg-white/[0.02]'
               }`}
             >
               {tab}
+              {filter === tab && (
+                <motion.div layoutId="tab-underline" className="absolute bottom-1 left-2 right-2 h-0.5 bg-white/40 rounded-full" />
+              )}
             </button>
           ))}
         </div>
 
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-white/30" />
+        <div className="relative w-full lg:w-[400px] group">
+          <div className="absolute inset-0 bg-white/5 blur-xl group-focus-within:bg-white/10 transition-all duration-500 rounded-2xl" />
+          <Search className="absolute left-5 top-1/2 -translate-y-1/2 size-5 text-white/30 group-focus-within:text-white/60 transition-colors" />
           <input
             type="text"
             placeholder="Search by name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all font-medium"
+            className="relative w-full bg-[#0A0A0A]/80 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all font-bold tracking-tight text-lg"
           />
         </div>
       </div>
 
       {/* Log List */}
-      <div className="space-y-10 pb-20">
-        {Object.keys(groupedLogs).length === 0 ? (
-          <div className="py-20 text-center space-y-4">
-            <div className="size-20 bg-white/5 rounded-full flex items-center justify-center mx-auto">
-              <PhoneCall className="size-8 text-white/20" />
-            </div>
-            <p className="text-white/40 font-medium text-lg">No call logs found matching your criteria.</p>
-          </div>
-        ) : (
-          Object.entries(groupedLogs).map(([date, logsInGroup]) => (
-            <div key={date} className="space-y-4">
-              <div className="text-[11px] font-black tracking-[0.2em] text-white/30 uppercase px-2">
-                {date}
+      <div className="space-y-12 pb-24">
+        <AnimatePresence mode="popLayout">
+          {Object.keys(groupedLogs).length === 0 ? (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="py-32 text-center space-y-6 bg-white/[0.02] border border-dashed border-white/10 rounded-[3rem]"
+            >
+              <div className="size-24 bg-white/5 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                <Phone className="size-10 text-white/10" />
               </div>
-              <div className="space-y-px rounded-3xl overflow-hidden border border-white/5">
-                {logsInGroup.map((log) => (
-                  <CallLogRow 
-                    key={log._id} 
-                    log={log} 
-                    onCall={() => initiateCall(log.otherUser, log.conversationId)} 
-                  />
-                ))}
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-white">No logs found</h3>
+                <p className="text-white/30 font-bold uppercase tracking-widest text-xs">Try adjusting your filters</p>
               </div>
-            </div>
-          ))
-        )}
+            </motion.div>
+          ) : (
+            Object.entries(groupedLogs).map(([key, group], groupIdx) => (
+              <motion.div 
+                key={key}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: groupIdx * 0.1 }}
+                className="space-y-5"
+              >
+                <div className="flex items-center gap-4 px-2">
+                  <span className="text-sm font-black tracking-[0.3em] text-white/30 uppercase">
+                    {group.label}
+                  </span>
+                  <div className="h-px flex-1 bg-white/5" />
+                </div>
+                <div className="grid gap-1 rounded-[2.5rem] overflow-hidden border border-white/5 bg-white/[0.01] backdrop-blur-3xl p-1 shadow-2xl">
+                  {group.logs.map((log) => (
+                    <CallLogRow 
+                      key={log._id} 
+                      log={log} 
+                      onCall={() => initiateCall(log.otherUser, log.conversationId)} 
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            ))
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
 }
 
-function StatCard({ value, label, color = 'white' }) {
+function StatCard({ value, label, color = 'white', glowColor }) {
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-6 transition-all hover:bg-white/[0.07] group">
-      <div className="text-3xl font-black mb-1 transition-all group-hover:scale-105 origin-left" style={{ color }}>
-        {value}
+    <motion.div 
+      whileHover={{ y: -5, backgroundColor: 'rgba(255,255,255,0.08)' }}
+      className="bg-white/5 border border-white/10 rounded-[2rem] p-8 transition-all relative overflow-hidden group"
+    >
+      {glowColor && (
+        <div 
+          className="absolute -right-4 -top-4 size-24 blur-[60px] opacity-20 transition-opacity group-hover:opacity-40" 
+          style={{ background: glowColor }}
+        />
+      )}
+      <div className="relative z-10">
+        <div className="text-5xl font-black mb-2 transition-all tracking-tighter" style={{ color }}>
+          {value}
+        </div>
+        <div className="text-xs font-black text-white/30 uppercase tracking-[0.2em]">
+          {label}
+        </div>
       </div>
-      <div className="text-sm font-bold text-white/30 uppercase tracking-wider">
-        {label}
-      </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -208,75 +241,89 @@ function CallLogRow({ log, onCall }) {
   const isCompleted = log.status === 'completed';
   const isIncoming = log.direction === 'incoming';
   
-  let arrowColor = INFO; // Blue for Outgoing
-  if (!isCompleted) arrowColor = DANGER; // Red for Missed
-  else if (isIncoming) arrowColor = ACCENT; // Green for Incoming
+  let arrowColor = INFO; 
+  if (!isCompleted) arrowColor = DANGER;
+  else if (isIncoming) arrowColor = ACCENT;
 
   return (
-    <div className="group flex items-center gap-6 p-5 bg-white/[0.02] hover:bg-white/[0.05] transition-all border-b border-white/5 last:border-0 relative">
+    <motion.div 
+      layout
+      whileHover={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
+      className="group flex items-center gap-6 p-6 transition-all border-b border-white/[0.03] last:border-0 relative"
+    >
       {/* Direction Icon */}
-      <div className="relative">
-        <div className={`size-10 rounded-full flex items-center justify-center`} style={{ background: `${arrowColor}20`, color: arrowColor }}>
-          {log.status !== 'completed' ? (
-            <PhoneMissed size={18} className="rotate-0" />
+      <div className="relative shrink-0">
+        <div 
+          className="size-14 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg" 
+          style={{ background: `${arrowColor}15`, color: arrowColor, border: `1px solid ${arrowColor}20` }}
+        >
+          {!isCompleted ? (
+            <PhoneMissed size={24} className="animate-pulse" />
           ) : isIncoming ? (
-            <PhoneIncoming size={18} />
+            <PhoneIncoming size={24} />
           ) : (
-            <PhoneOutgoing size={18} />
+            <PhoneOutgoing size={24} />
           )}
         </div>
+        {!isCompleted && (
+          <div className="absolute -top-1 -right-1 size-3 bg-red-500 rounded-full border-2 border-black" />
+        )}
       </div>
 
       {/* Avatar */}
-      <div className="size-12 rounded-full flex items-center justify-center text-sm font-black bg-white/10 text-white shrink-0 shadow-inner">
+      <div className="size-14 rounded-2xl flex items-center justify-center text-lg font-black bg-white/10 text-white shrink-0 shadow-2xl relative overflow-hidden group-hover:ring-2 ring-white/20 transition-all">
         {log.otherUser.avatar ? (
-          <img src={log.otherUser.avatar} className="size-full rounded-full object-cover" />
+          <img src={log.otherUser.avatar} className="size-full object-cover" alt={log.otherUser.name} />
         ) : (
-          log.otherUser.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+          <div className="size-full flex items-center justify-center bg-gradient-to-br from-white/10 to-white/5 uppercase">
+            {log.otherUser.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+          </div>
         )}
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <h4 className="text-lg font-bold text-white truncate">{log.otherUser.name}</h4>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-            isCompleted ? 'bg-white/10 text-white/60' : 'bg-red-500/20 text-red-500'
+        <div className="flex items-center gap-3 mb-1">
+          <h4 className="text-xl font-black text-white tracking-tight truncate">{log.otherUser.name}</h4>
+          <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] ${
+            isCompleted 
+              ? 'bg-white/10 text-white/60' 
+              : 'bg-red-500/10 text-red-500 border border-red-500/20'
           }`}>
             {log.status}
           </span>
         </div>
-        <p className="text-sm text-white/40 font-medium">
-          {log.otherUser.specialty} • {log.direction.charAt(0).toUpperCase() + log.direction.slice(1)}
-        </p>
+        <div className="flex items-center gap-2 text-white/30 font-bold text-xs uppercase tracking-widest">
+          <span className="text-white/50">{log.otherUser.specialty}</span>
+          <span className="size-1 rounded-full bg-white/10" />
+          <span>{log.direction}</span>
+        </div>
       </div>
 
       {/* Time & Duration */}
-      <div className="text-right shrink-0">
-        <div className="text-sm font-bold text-white/60">
-          {formatTime(log.createdAt)}
+      <div className="text-right shrink-0 hidden sm:block">
+        <div className="text-sm font-black text-white mb-1">
+          {new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
-        <div className={`text-sm font-black ${isCompleted ? 'text-white/40' : 'text-white/20'}`}>
-          {isCompleted ? formatDuration(log.duration) : '---'}
+        <div className={`text-xs font-black uppercase tracking-widest ${isCompleted ? 'text-white/20' : 'text-red-500/40'}`}>
+          {isCompleted ? formatDuration(log.duration) : '--'}
         </div>
       </div>
 
       {/* Action */}
       <div className="pl-4">
-        <button 
+        <motion.button 
+          whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,1)', color: 'black' }}
+          whileTap={{ scale: 0.95 }}
           onClick={onCall}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 text-white transition-all text-sm font-bold group/btn"
+          className="flex items-center gap-3 px-6 py-3.5 rounded-2xl border border-white/10 bg-white/5 text-white transition-all text-sm font-black uppercase tracking-widest group/btn shadow-[0_0_20px_rgba(255,255,255,0)] hover:shadow-[0_0_20px_rgba(255,255,255,0.2)]"
         >
-          <PhoneCall size={16} className="group-hover/btn:scale-110 transition-transform" />
-          <span className="opacity-80">Call again</span>
-        </button>
+          <PhoneCall size={18} />
+          <span className="hidden md:inline">Call again</span>
+        </motion.button>
       </div>
-    </div>
+    </motion.div>
   );
-}
-
-function formatTime(dateStr) {
-  return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatDuration(s) {
