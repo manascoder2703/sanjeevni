@@ -22,23 +22,18 @@ export function CallProvider({ children }) {
   const pcRef = useRef(null);
   const audioRef = useRef(null);
 
-  // Initialize persistent audio element
-  useEffect(() => {
-    const audio = document.createElement('audio');
-    audio.autoplay = true;
-    audio.hidden = true;
-    document.body.appendChild(audio);
-    audioRef.current = audio;
-    return () => {
-      document.body.removeChild(audio);
-    };
-  }, []);
-
   // Update audio source when remote stream changes
   useEffect(() => {
     if (audioRef.current && remoteStream) {
+      console.log('🔊 Attaching remote stream to audio element');
       audioRef.current.srcObject = remoteStream;
-      audioRef.current.play().catch(err => console.warn('Autoplay blocked:', err));
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => {
+          console.warn('⚠️ Audio play promise rejected:', err);
+          // Try to play again or notify user
+        });
+      }
     }
   }, [remoteStream]);
 
@@ -90,7 +85,19 @@ export function CallProvider({ children }) {
       }
     };
 
+    pc.oniceconnectionstatechange = () => {
+      console.log('🧊 ICE Connection State:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'failed') {
+        toast.error('Connection failed. A TURN server may be required.');
+      }
+    };
+
+    pc.onsignalingstatechange = () => {
+      console.log('🚦 Signaling State:', pc.signalingState);
+    };
+
     pc.onconnectionstatechange = () => {
+      console.log('🔌 Peer Connection State:', pc.connectionState);
       if (['disconnected', 'failed', 'closed'].includes(pc.connectionState)) {
         cleanup();
       }
@@ -110,6 +117,7 @@ export function CallProvider({ children }) {
     if (!socket) return;
 
     const handleIncoming = ({ callerName, callerId, roomId: rId }) => {
+      console.log('📞 Incoming call from:', callerName);
       if (stateRef.current.callState !== 'idle') {
         socket.emit('call:rejected', { toUserId: callerId, roomId: rId });
         return;
@@ -121,6 +129,7 @@ export function CallProvider({ children }) {
     };
 
     const handleAccepted = async ({ roomId: rId }) => {
+      console.log('✅ Call accepted signal received');
       if (stateRef.current.callState !== 'offering') return;
       setCallState('connected');
       toast.success('Call accepted');
@@ -128,8 +137,10 @@ export function CallProvider({ children }) {
 
     const handleUserJoined = async () => {
       const { callState: curState, localStream: curStream, roomId: curRoom } = stateRef.current;
+      console.log('👥 User joined room, current state:', curState);
       if (curState === 'connected' || curState === 'offering') {
         if (!curStream) return;
+        console.log('🚀 Creating Offer...');
         const pc = pcRef.current || createPC(curStream);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -139,6 +150,7 @@ export function CallProvider({ children }) {
 
     const handleOffer = async ({ offer }) => {
       const { localStream: curStream, roomId: curRoom } = stateRef.current;
+      console.log('📡 Received Offer, creating Answer...');
       if (!curStream) return;
       const pc = pcRef.current || createPC(curStream);
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
@@ -148,14 +160,18 @@ export function CallProvider({ children }) {
     };
 
     const handleAnswer = async ({ answer }) => {
+      console.log('📡 Received Answer, setting remote description');
       if (pcRef.current) {
         await pcRef.current.setRemoteDescription(new RTCSessionDescription(answer));
       }
     };
 
     const handleIce = async ({ candidate }) => {
+      console.log('🧊 Received ICE Candidate from peer');
       if (pcRef.current) {
-        try { await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) {}
+        try { await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) {
+          console.warn('⚠️ ICE Candidate Error:', e);
+        }
       }
     };
 
@@ -181,6 +197,7 @@ export function CallProvider({ children }) {
   }, [socket, createPC, cleanup]);
 
   const initiateCall = async (targetUser, rId) => {
+    console.log('🚀 Initiating call to:', targetUser.name);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       setLocalStream(stream);
@@ -195,8 +212,7 @@ export function CallProvider({ children }) {
         roomId: rId 
       });
       
-      // Also join the room ourselves so we can receive WebRTC signals
-      socket.emit('join-room', { roomId: rId, userId: user.id, userName: user.name });
+      socket.emit('join-room', { roomId: rId, userId: user.id || user.userId, userName: user.name });
 
     } catch (err) {
       toast.error('Could not access microphone');
@@ -205,15 +221,15 @@ export function CallProvider({ children }) {
   };
 
   const acceptCall = async () => {
+    console.log('✅ Accepting call from:', remoteUser?.name);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       setLocalStream(stream);
       setCallState('connected');
       
       socket.emit('call:accepted', { toUserId: remoteUser.id, roomId });
-      socket.emit('join-room', { roomId, userId: user.id, userName: user.name });
+      socket.emit('join-room', { roomId, userId: user.id || user.userId, userName: user.name });
       
-      // Create PC and wait for offer
       createPC(stream);
 
     } catch (err) {
@@ -223,6 +239,7 @@ export function CallProvider({ children }) {
   };
 
   const rejectCall = () => {
+    console.log('❌ Rejecting call');
     if (remoteUser && roomId) {
       socket.emit('call:rejected', { toUserId: remoteUser.id, roomId });
     }
@@ -230,6 +247,7 @@ export function CallProvider({ children }) {
   };
 
   const hangupCall = () => {
+    console.log('📞 Hanging up call');
     if (remoteUser && roomId) {
       socket.emit('call:hangup', { toUserId: remoteUser.id, roomId });
     }
@@ -252,6 +270,7 @@ export function CallProvider({ children }) {
       initiateCall, acceptCall, rejectCall, hangupCall, toggleMute
     }}>
       {children}
+      <audio ref={audioRef} autoPlay playsInline style={{ display: 'none' }} />
     </CallContext.Provider>
   );
 }
