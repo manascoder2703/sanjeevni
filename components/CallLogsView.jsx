@@ -1,28 +1,22 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Phone,
   PhoneCall,
   PhoneIncoming,
   PhoneOutgoing,
   PhoneMissed,
   Search,
-  Phone,
-  RefreshCcw,
-  Clock3,
-  CheckCircle2,
-  XCircle,
-  ArrowUpDown,
-  Filter,
 } from 'lucide-react';
-import { useCall } from '@/context/CallContext';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { useCall } from '@/context/CallContext';
 
-const ACCENT = '#18B6A2';
-const DANGER = '#EF4444';
-const INFO = '#3B82F6';
-const PANEL = 'rgba(255,255,255,0.03)';
+const CHIP_MAP = ['All', 'Incoming', 'Outgoing', 'Missed'];
+const SURFACE = 'bg-[#1f1f1f]/88';
+const SURFACE_SOFT = 'bg-[#232323]/86';
+const BORDER = 'border-white/12';
 
 export default function CallLogsView({ role }) {
   const { initiateCall, callState } = useCall();
@@ -31,25 +25,21 @@ export default function CallLogsView({ role }) {
   const [error, setError] = useState('');
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
-  const [sortOrder, setSortOrder] = useState('latest');
-  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchLogs = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    if (silent) setRefreshing(true);
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
     setError('');
     try {
       const res = await fetch('/api/calls', { cache: 'no-store' });
       const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || 'Failed to load call logs');
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to fetch logs');
       setLogs(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err.message || 'Failed to load call logs');
-      toast.error('Failed to load call logs');
-      console.error(err);
+      const message = err?.message || 'Failed to fetch logs';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
@@ -58,39 +48,22 @@ export default function CallLogsView({ role }) {
   }, [fetchLogs]);
 
   const filteredLogs = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    const next = logs.filter((log) => {
-      const name = log?.otherUser?.name || 'Unknown User';
-      const specialty = log?.otherUser?.specialty || '';
-      const matchesSearch =
-        !normalizedSearch ||
-        name.toLowerCase().includes(normalizedSearch) ||
-        specialty.toLowerCase().includes(normalizedSearch);
-      const matchesFilter = 
-        filter === 'All' || 
-        (filter === 'Incoming' && log.direction === 'incoming') ||
-        (filter === 'Outgoing' && log.direction === 'outgoing') ||
-        (filter === 'Missed' && (log.status === 'missed' || log.status === 'rejected' || log.status === 'declined'));
-      return matchesSearch && matchesFilter;
-    });
-    return [...next].sort((a, b) => {
-      const aTime = new Date(a?.createdAt || 0).getTime();
-      const bTime = new Date(b?.createdAt || 0).getTime();
-      return sortOrder === 'latest' ? bTime - aTime : aTime - bTime;
-    });
-  }, [logs, search, filter, sortOrder]);
-
-  const filterCounts = useMemo(() => {
-    const incoming = logs.filter((log) => log.direction === 'incoming').length;
-    const outgoing = logs.filter((log) => log.direction === 'outgoing').length;
-    const missed = logs.filter((log) => ['missed', 'rejected', 'declined'].includes(log.status)).length;
-    return {
-      All: logs.length,
-      Incoming: incoming,
-      Outgoing: outgoing,
-      Missed: missed,
-    };
-  }, [logs]);
+    const query = search.trim().toLowerCase();
+    return logs
+      .filter((log) => {
+        const name = log?.otherUser?.name || '';
+        const specialty = log?.otherUser?.specialty || '';
+        const matchesSearch = !query || name.toLowerCase().includes(query) || specialty.toLowerCase().includes(query);
+        const missed = ['missed', 'rejected', 'declined'].includes(log.status);
+        const matchesFilter =
+          filter === 'All' ||
+          (filter === 'Incoming' && log.direction === 'incoming') ||
+          (filter === 'Outgoing' && log.direction === 'outgoing') ||
+          (filter === 'Missed' && missed);
+        return matchesSearch && matchesFilter;
+      })
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [logs, search, filter]);
 
   const stats = useMemo(() => {
     const total = logs.length;
@@ -98,314 +71,198 @@ export default function CallLogsView({ role }) {
     const missed = logs.filter((l) => l.status !== 'completed').length;
     const totalSeconds = logs.reduce((acc, curr) => acc + (curr.duration || 0), 0);
     const totalMins = Math.round(totalSeconds / 60);
-
-    return { total, completed, missed, totalMins, visible: filteredLogs.length };
-  }, [logs, filteredLogs.length]);
+    return { total, completed, missed, totalMins };
+  }, [logs]);
 
   const groupedLogs = useMemo(() => {
-    const groups = {};
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+    const grouped = {};
+    const today = new Date();
+    const yesterday = new Date(Date.now() - 86400000);
 
     filteredLogs.forEach((log) => {
-      const date = new Date(log.createdAt);
-      const bucketDate = new Date(date);
-      bucketDate.setHours(0, 0, 0, 0);
-      const key = bucketDate.toISOString();
-
-      if (!groups[key]) {
-        let label = bucketDate.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
-        if (bucketDate.getTime() === today.getTime()) label = 'Today';
-        if (bucketDate.getTime() === yesterday.getTime()) label = 'Yesterday';
-        groups[key] = { key, label, logs: [] };
-      }
-      groups[key].logs.push(log);
+      const d = new Date(log.createdAt);
+      let label = d.toLocaleDateString([], { day: '2-digit', month: 'short' }).toUpperCase();
+      if (d.toDateString() === today.toDateString()) label = 'TODAY';
+      else if (d.toDateString() === yesterday.toDateString()) label = 'YESTERDAY';
+      if (!grouped[label]) grouped[label] = [];
+      grouped[label].push(log);
     });
 
-    const list = Object.values(groups).sort((a, b) => {
-      const aTime = new Date(a.key).getTime();
-      const bTime = new Date(b.key).getTime();
-      return sortOrder === 'latest' ? bTime - aTime : aTime - bTime;
-    });
-    return list;
-  }, [filteredLogs, sortOrder]);
+    const ordered = [];
+    if (grouped.TODAY) ordered.push(['TODAY', grouped.TODAY]);
+    if (grouped.YESTERDAY) ordered.push(['YESTERDAY', grouped.YESTERDAY]);
+    Object.keys(grouped)
+      .filter((k) => !['TODAY', 'YESTERDAY'].includes(k))
+      .sort((a, b) => {
+        const aDate = new Date(grouped[a][0]?.createdAt || 0).getTime();
+        const bDate = new Date(grouped[b][0]?.createdAt || 0).getTime();
+        return bDate - aDate;
+      })
+      .forEach((k) => ordered.push([k, grouped[k]]));
+    return ordered;
+  }, [filteredLogs]);
 
-  const onCall = (log) => {
+  const onCallAgain = (log) => {
     if (callState !== 'idle') {
       toast.error('You are already in a call');
       return;
     }
     if (!log?.conversationId || !log?.otherUser?.id) {
-      toast.error('This call cannot be started from logs');
+      toast.error('Call unavailable for this log');
       return;
     }
     initiateCall(log.otherUser, log.conversationId);
   };
 
-  const clearFilters = () => {
-    setFilter('All');
-    setSearch('');
-    setSortOrder('latest');
-  };
-
   if (loading) {
     return (
-      <div className="w-full max-w-7xl mx-auto p-6 md:p-8">
-        <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-8 md:p-10">
-          <div className="size-12 relative mx-auto">
-            <div className="absolute inset-0 rounded-full border-4 border-white/10" />
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-white animate-spin" />
-          </div>
-          <p className="mt-4 text-center text-sm text-white/55 font-semibold">Loading call logs...</p>
+      <div className="w-full max-w-5xl mx-auto px-6 py-10">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] py-16 text-center">
+          <p className="text-white/60 font-semibold">Loading call logs...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full self-stretch">
-      <section className="w-full max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-6">
-        <div className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02))] p-5 md:p-7">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="space-y-1">
-              <h1 className="text-[11px] md:text-xs font-black tracking-[0.25em] text-white/40 uppercase">
-                {role === 'doctor' ? 'Doctor Portal' : 'Patient Portal'}
-              </h1>
-              <h2 className="text-3xl md:text-4xl font-black text-white tracking-tight">Call Logs</h2>
-              <p className="text-sm md:text-base text-white/65 font-medium">
-                Monitor audio consultation history with your {role === 'doctor' ? 'patients' : 'doctors'}.
-              </p>
-            </div>
-            <button
-              onClick={() => fetchLogs(true)}
-              disabled={refreshing}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-black uppercase tracking-[0.18em] text-white/90 transition hover:bg-white/10 disabled:opacity-50"
-            >
-              <RefreshCcw className={`size-4 ${refreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+    <div className="w-full max-w-5xl mx-auto px-4 md:px-6 py-7 md:py-8">
+      <div className="space-y-4">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.22em] text-white/45 font-black">
+            {role === 'doctor' ? 'Doctor Portal' : 'Patient Portal'}
+          </p>
+          <h1 className="text-[40px] leading-[1.05] font-black text-white mt-1 tracking-tight">Call logs</h1>
+          <p className="text-white/60 text-[23px] leading-6 font-medium mt-1">
+            History of all audio consultations with your {role === 'doctor' ? 'patients' : 'doctors'}.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatTile label="Total calls" value={stats.total} />
+          <StatTile label="Completed" value={stats.completed} color="text-emerald-400" />
+          <StatTile label="Missed" value={stats.missed} color="text-rose-400" />
+          <StatTile label="Total talk time" value={stats.totalMins > 0 ? `${stats.totalMins}m` : '--'} />
+        </div>
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
+          <div className="flex flex-wrap items-center gap-2">
+            {CHIP_MAP.map((chip) => (
+              <button
+                key={chip}
+                onClick={() => setFilter(chip)}
+                className={`h-10 px-4 rounded-xl border text-[15px] font-semibold transition ${
+                  filter === chip
+                    ? 'bg-white/14 border-white/35 text-white'
+                    : `${SURFACE_SOFT} border-white/15 text-white/75 hover:text-white hover:bg-[#2b2b2b]/92`
+                }`}
+              >
+                {chip}
+              </button>
+            ))}
           </div>
 
-          <div className="mt-5 grid grid-cols-2 xl:grid-cols-5 gap-3">
-            <StatCard value={stats.total} label="Total calls" icon={PhoneCall} />
-            <StatCard value={stats.completed} label="Completed" color={ACCENT} glowColor={ACCENT} icon={CheckCircle2} />
-            <StatCard value={stats.missed} label="Missed" color={DANGER} glowColor={DANGER} icon={XCircle} />
-            <StatCard value={stats.totalMins > 0 ? `${stats.totalMins}m` : '--'} label="Talk time" icon={Clock3} />
-            <StatCard value={stats.visible} label="Visible" icon={Filter} />
+          <div className="relative w-full md:w-[280px]">
+            <Search className="size-4 text-white/45 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name..."
+              className={`h-10 w-full rounded-xl border ${BORDER} ${SURFACE_SOFT} pl-9 pr-3 text-[15px] text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20`}
+            />
           </div>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 md:p-4 space-y-3">
-          <div className="flex flex-col xl:flex-row xl:items-center gap-3 justify-between">
-            <div className="flex flex-wrap gap-2">
-              {['All', 'Incoming', 'Outgoing', 'Missed'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setFilter(tab)}
-                  className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-black uppercase tracking-[0.14em] border transition ${
-                    filter === tab
-                      ? 'bg-white text-black border-white'
-                      : 'bg-white/5 text-white/75 border-white/15 hover:text-white hover:bg-white/10'
-                  }`}
-                >
-                  {tab}
-                  <span className={`${filter === tab ? 'text-black/80' : 'text-white/55'}`}>({filterCounts[tab]})</span>
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSortOrder((prev) => (prev === 'latest' ? 'oldest' : 'latest'))}
-                className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 text-xs font-black uppercase tracking-[0.14em] text-white/85 hover:bg-white/10 transition"
-              >
-                <ArrowUpDown className="size-4" />
-                {sortOrder === 'latest' ? 'Latest' : 'Oldest'}
-              </button>
-              <div className="relative min-w-0 w-full sm:w-[320px]">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-white/45" />
-                <input
-                  type="text"
-                  placeholder="Search by name or specialty"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-white/15 bg-[#0A0A0A]/85 pl-10 pr-3 text-sm text-white placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-white/20"
-                />
-              </div>
-            </div>
-          </div>
-
-          {(filter !== 'All' || search || sortOrder !== 'latest') && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2">
-              <p className="text-xs text-white/60 font-semibold">Filters applied to call logs</p>
-              <button
-                onClick={clearFilters}
-                className="text-xs font-black uppercase tracking-[0.12em] text-white/80 hover:text-white"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-        </div>
-
-        {!!error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/8 px-4 py-3 text-sm text-red-300 font-medium">
+        {error && (
+          <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             {error}
           </div>
         )}
 
-        <div className="space-y-5 pb-10">
-          <AnimatePresence mode="popLayout">
-            {groupedLogs.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                className="py-16 md:py-20 text-center rounded-3xl border border-dashed border-white/15 bg-white/[0.02]"
-              >
-                <div className="size-16 md:size-20 bg-white/5 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                  <Phone className="size-7 md:size-9 text-white/20" />
+        {groupedLogs.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.02] py-16 text-center">
+            <Phone className="size-8 text-white/20 mx-auto mb-3" />
+            <p className="text-white/70 font-bold">No logs found</p>
+          </div>
+        ) : (
+          <div className={`rounded-2xl border ${BORDER} ${SURFACE} overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.35)]`}>
+            {groupedLogs.map(([label, rows]) => (
+              <div key={label}>
+                <div className="px-4 py-2 border-y border-white/10 bg-[#2a2a2a]/90 text-[11px] font-black tracking-[0.16em] text-white/45 uppercase">
+                  {label}
                 </div>
-                <h3 className="mt-4 text-xl md:text-2xl font-black text-white">No call logs found</h3>
-                <p className="mt-1 text-sm text-white/55">Try changing filters or search terms.</p>
-              </motion.div>
-            ) : (
-              groupedLogs.map((group, groupIdx) => (
-                <motion.div
-                  key={group.key}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: groupIdx * 0.04 }}
-                  className="space-y-2"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-white/70">
-                      {group.label}
-                    </span>
-                    <div className="h-px flex-1 bg-white/10" />
-                  </div>
-
-                  <div className="rounded-2xl border border-white/10 overflow-hidden">
-                    <div className="hidden md:grid grid-cols-[minmax(0,1.8fr)_130px_130px_150px] gap-2 px-4 py-3 text-[11px] uppercase tracking-[0.18em] text-white/45 font-black bg-white/[0.03]">
-                      <span>Participant</span>
-                      <span>Direction</span>
-                      <span>Status</span>
-                      <span className="text-right">Action</span>
-                    </div>
-                    {group.logs.map((log) => (
-                      <CallLogRow
-                        key={log._id}
-                        log={log}
-                        isBusy={callState !== 'idle'}
-                        onCall={() => onCall(log)}
-                      />
-                    ))}
-                  </div>
-                </motion.div>
-              ))
-            )}
-          </AnimatePresence>
-        </div>
-      </section>
+                {rows.map((log) => (
+                  <CallRow key={log._id} log={log} isBusy={callState !== 'idle'} onCallAgain={() => onCallAgain(log)} />
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function StatCard({ value, label, color = 'white', glowColor, icon: Icon }) {
+function StatTile({ label, value, color = 'text-white' }) {
   return (
-    <motion.div
-      whileHover={{ y: -2 }}
-      className="relative overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] p-4"
-      style={{ background: PANEL }}
-    >
-      {glowColor && (
-        <div
-          className="pointer-events-none absolute -right-6 -top-6 size-20 blur-[55px] opacity-25"
-          style={{ background: glowColor }}
-        />
-      )}
-      <div className="relative z-10 space-y-1">
-        <div className="inline-flex rounded-lg border border-white/10 bg-black/20 p-1.5 text-white/75">
-          {Icon ? <Icon className="size-4" /> : <Phone className="size-4" />}
+    <div className={`rounded-xl border ${BORDER} ${SURFACE_SOFT} px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]`}>
+      <div className={`text-4xl leading-9 font-black ${color}`}>{value}</div>
+      <div className="text-[18px] text-white/70 leading-5 mt-1">{label}</div>
+    </div>
+  );
+}
+
+function CallRow({ log, onCallAgain, isBusy }) {
+  const isIncoming = log.direction === 'incoming';
+  const isCompleted = log.status === 'completed';
+  const canCall = Boolean(log?.conversationId && log?.otherUser?.id) && !isBusy;
+
+  return (
+    <motion.div layout className="px-4 py-3 border-b border-white/10 last:border-b-0 hover:bg-[#2a2a2a]/85 transition">
+      <div className="flex items-center gap-3">
+        <div className={`size-9 rounded-full flex items-center justify-center border ${isIncoming ? 'bg-emerald-200/20 border-emerald-100/35 text-emerald-50' : 'bg-blue-200/20 border-blue-100/35 text-blue-50'}`}>
+          {isIncoming ? <PhoneIncoming size={14} /> : <PhoneOutgoing size={14} />}
         </div>
-        <div className="text-xl md:text-3xl font-black tracking-tight" style={{ color }}>{value}</div>
-        <div className="text-[10px] md:text-[11px] font-black text-white/50 uppercase tracking-[0.18em]">{label}</div>
+        <div className="size-9 rounded-full bg-[#e8ecef] text-[#49515b] flex items-center justify-center text-xs font-black uppercase">
+          {(log?.otherUser?.name || 'U').split(' ').map((x) => x[0]).join('').slice(0, 2)}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-white text-[22px] leading-6 font-bold truncate">{log?.otherUser?.name || 'Unknown user'}</p>
+          <p className="text-white/65 text-[15px] leading-5 truncate">
+            {log?.otherUser?.specialty || 'Consultation'} · {capitalize(log.direction)}
+          </p>
+          <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${
+            isCompleted ? 'bg-emerald-100/85 text-emerald-900' : 'bg-rose-100/85 text-rose-900'
+          }`}>
+            {capitalize(log.status)}
+          </span>
+        </div>
+
+        <div className="text-right shrink-0">
+          <p className="text-white/70 text-sm font-semibold">{new Date(log.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+          <p className="text-white text-sm font-black">{isCompleted ? formatDuration(log.duration) : '—'}</p>
+          <button
+            onClick={onCallAgain}
+            disabled={!canCall}
+            className="mt-2 inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-white/25 bg-[#2c2c2c]/95 text-white text-sm font-semibold hover:bg-[#3a3a3a] transition disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <PhoneCall size={14} />
+            Call again
+          </button>
+        </div>
       </div>
     </motion.div>
   );
 }
 
-function CallLogRow({ log, onCall, isBusy }) {
-  const isCompleted = log.status === 'completed';
-  const isIncoming = log.direction === 'incoming';
-  const canCall = Boolean(log?.conversationId && log?.otherUser?.id) && !isBusy;
-
-  let iconColor = INFO;
-  if (!isCompleted) iconColor = DANGER;
-  else if (isIncoming) iconColor = ACCENT;
-
-  return (
-    <div className="grid md:grid-cols-[minmax(0,1.8fr)_130px_130px_150px] gap-2 items-center px-4 py-4 border-t border-white/10 bg-white/[0.01] hover:bg-white/[0.04] transition">
-      <div className="flex items-center gap-3 min-w-0">
-        <div
-          className="size-10 rounded-xl flex items-center justify-center border shrink-0"
-          style={{ background: `${iconColor}16`, borderColor: `${iconColor}55`, color: iconColor }}
-        >
-          {!isCompleted ? <PhoneMissed size={16} /> : isIncoming ? <PhoneIncoming size={16} /> : <PhoneOutgoing size={16} />}
-        </div>
-        <div className="size-10 rounded-full overflow-hidden bg-white/10 shrink-0">
-          {log?.otherUser?.avatar ? (
-            <img src={log.otherUser.avatar} className="size-full object-cover" alt={log.otherUser?.name || 'User'} />
-          ) : (
-            <div className="size-full flex items-center justify-center text-xs font-black text-white/85 bg-gradient-to-br from-white/10 to-white/5 uppercase">
-              {(log?.otherUser?.name || 'U')
-                .split(' ')
-                .map((n) => n[0])
-                .join('')
-                .slice(0, 2)}
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-0">
-          <p className="text-sm md:text-base font-bold text-white truncate">{log?.otherUser?.name || 'Unknown user'}</p>
-          <p className="text-xs text-white/55 truncate">
-            {log?.otherUser?.specialty || (isIncoming ? 'Incoming call' : 'Outgoing call')}
-            <span className="mx-1 text-white/35">·</span>
-            {new Date(log.createdAt).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}
-            {isCompleted ? <><span className="mx-1 text-white/35">·</span>{formatDuration(log.duration)}</> : null}
-          </p>
-        </div>
-      </div>
-
-      <div className="text-xs font-bold uppercase tracking-[0.12em] text-white/70">{log.direction}</div>
-
-      <div>
-        <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.13em] ${
-          isCompleted
-            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25'
-            : 'bg-red-500/15 text-red-300 border border-red-500/25'
-        }`}>
-          {log.status}
-        </span>
-      </div>
-
-      <div className="md:text-right">
-        <button
-          onClick={onCall}
-          disabled={!canCall}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-white/15 px-3 text-xs font-black uppercase tracking-[0.12em] text-white/85 bg-white/5 hover:bg-white/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <PhoneCall size={14} />
-          {isBusy ? 'Busy' : canCall ? 'Call again' : 'Unavailable'}
-        </button>
-      </div>
-    </div>
-  );
+function capitalize(s = '') {
+  if (!s) return '';
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function formatDuration(s) {
-  if (!s) return '--';
-  const mins = Math.floor(s / 60);
-  const secs = s % 60;
+function formatDuration(value) {
+  if (!value) return '--';
+  const mins = Math.floor(value / 60);
+  const secs = value % 60;
   return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 }
