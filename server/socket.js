@@ -305,6 +305,27 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('ice-candidate', { candidate, from: socket.id });
   });
 
+  // --- Global Audio Call Signaling ---
+  socket.on('call:request', ({ toUserId, callerName, callerId, roomId }) => {
+    console.log(`📞 Call Request from ${callerName} (${callerId}) to ${toUserId} in room ${roomId}`);
+    socket.to(String(toUserId)).emit('call:incoming', { callerName, callerId, roomId });
+  });
+
+  socket.on('call:accepted', ({ toUserId, roomId }) => {
+    console.log(`✅ Call Accepted by ${socket.identifiedUserId} for room ${roomId}`);
+    socket.to(String(toUserId)).emit('call:accepted', { roomId });
+  });
+
+  socket.on('call:rejected', ({ toUserId, roomId }) => {
+    console.log(`❌ Call Rejected by ${socket.identifiedUserId} for room ${roomId}`);
+    socket.to(String(toUserId)).emit('call:rejected', { roomId });
+  });
+
+  socket.on('call:hangup', ({ toUserId, roomId }) => {
+    console.log(`📴 Call Hangup by ${socket.identifiedUserId} in room ${roomId}`);
+    socket.to(String(toUserId)).emit('call:hangup', { roomId });
+  });
+
   socket.on('chat-message', (data) => {
     const { roomId, message } = data;
     const room = rooms.get(roomId);

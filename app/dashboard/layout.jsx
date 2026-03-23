@@ -21,6 +21,8 @@ import React, { useEffect, useRef, useState } from "react"
 import CommandPalette from "@/components/CommandPalette"
 import { NotificationProvider } from "@/context/NotificationContext"
 import NotificationBell from "@/components/NotificationBell"
+import { CallProvider } from "@/context/CallContext"
+import AudioCallOverlay from "@/components/AudioCallOverlay"
 
 export default function DashboardLayout({ children }) {
   const { user, loading } = useAuth()
@@ -74,64 +76,67 @@ export default function DashboardLayout({ children }) {
 
   return (
     <NotificationProvider>
-      <SidebarProvider>
-        <CommandPalette />
-        <AppSidebar />
-        <SidebarInset className="bg-[#000000] text-white relative overflow-hidden flex flex-col min-h-screen">
-          <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-0"
-            style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
-          <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-blue-500/5 blur-[120px] pointer-events-none z-0"></div>
+      <CallProvider>
+        <SidebarProvider>
+          <CommandPalette />
+          <AppSidebar />
+          <SidebarInset className="bg-[#000000] text-white relative overflow-hidden flex flex-col min-h-screen">
+            <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-0"
+              style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
+            <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-blue-500/5 blur-[120px] pointer-events-none z-0"></div>
 
-          <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-6 md:px-8 sticky top-0 bg-[#000000]/80 backdrop-blur-md z-50">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="-ml-2 opacity-100 transition-opacity text-white" />
-              <Separator
-                orientation="vertical"
-                className="mx-2 h-4 bg-white/10"
-              />
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem className="hidden md:block">
-                    <BreadcrumbPage className="text-white font-medium">
-                      Sanjeevni
-                    </BreadcrumbPage>
-                  </BreadcrumbItem>
-                  {breadcrumbs.slice(1).map((bc, i) => (
-                    <React.Fragment key={bc.href}>
-                      <BreadcrumbSeparator className="hidden md:block text-white/10" />
-                      <BreadcrumbItem>
-                        {bc.isLast ? (
-                          <BreadcrumbPage className="text-white font-semibold tracking-tight">{bc.label}</BreadcrumbPage>
-                        ) : (
-                          <BreadcrumbLink href={bc.href} className="text-white/40 hover:text-white transition-colors capitalize font-medium">
-                            {bc.label}
-                          </BreadcrumbLink>
-                        )}
-                      </BreadcrumbItem>
-                    </React.Fragment>
-                  ))}
-                </BreadcrumbList>
-              </Breadcrumb>
+            <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-6 md:px-8 sticky top-0 bg-[#000000]/80 backdrop-blur-md z-50">
+              <div className="flex items-center gap-2">
+                <SidebarTrigger className="-ml-2 opacity-100 transition-opacity text-white" />
+                <Separator
+                  orientation="vertical"
+                  className="mx-2 h-4 bg-white/10"
+                />
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem className="hidden md:block">
+                      <BreadcrumbPage className="text-white font-medium">
+                        Sanjeevni
+                      </BreadcrumbPage>
+                    </BreadcrumbItem>
+                    {breadcrumbs.slice(1).map((bc, i) => (
+                      <React.Fragment key={bc.href}>
+                        <BreadcrumbSeparator className="hidden md:block text-white/10" />
+                        <BreadcrumbItem>
+                          {bc.isLast ? (
+                            <BreadcrumbPage className="text-white font-semibold tracking-tight">{bc.label}</BreadcrumbPage>
+                          ) : (
+                            <BreadcrumbLink href={bc.href} className="text-white/40 hover:text-white transition-colors capitalize font-medium">
+                              {bc.label}
+                            </BreadcrumbLink>
+                          )}
+                        </BreadcrumbItem>
+                      </React.Fragment>
+                    ))}
+                  </BreadcrumbList>
+                </Breadcrumb>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <NotificationBell />
+              </div>
+            </header>
+
+            <div
+              className={`flex-1 relative z-10 custom-scrollbar flex flex-col min-h-0 ${isChatPage ? "items-stretch overflow-hidden" : "items-center overflow-y-auto"}`}
+              style={{
+                paddingLeft: isChatPage ? '0' : '2.5rem',
+                paddingRight: isChatPage ? '0' : '2.5rem',
+                paddingTop: isChatPage ? '0' : '2rem',
+                paddingBottom: isChatPage ? '0' : '2rem',
+              }}
+            >
+              {children}
             </div>
-
-            <div className="flex items-center gap-4">
-              <NotificationBell />
-            </div>
-          </header>
-
-          <div
-            className={`flex-1 relative z-10 custom-scrollbar flex flex-col min-h-0 ${isChatPage ? "items-stretch overflow-hidden" : "items-center overflow-y-auto"}`}
-            style={{
-              paddingLeft: isChatPage ? '0' : '2.5rem',
-              paddingRight: isChatPage ? '0' : '2.5rem',
-              paddingTop: isChatPage ? '0' : '2rem',
-              paddingBottom: isChatPage ? '0' : '2rem',
-            }}
-          >
-            {children}
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
+          </SidebarInset>
+        </SidebarProvider>
+        <AudioCallOverlay />
+      </CallProvider>
     </NotificationProvider>
   )
 }

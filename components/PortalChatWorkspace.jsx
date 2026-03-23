@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useNotifications } from '@/context/NotificationContext';
 import toast from 'react-hot-toast';
+import { useCall } from '@/context/CallContext';
 import {
   CalendarPlus,
   FileText,
@@ -102,6 +103,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
   const [deleting, setDeleting] = useState(false);
 
   const { socket } = useNotifications();
+  const { initiateCall, callState } = useCall();
   const selectedRef = useRef(null);
   const typingTimerRef = useRef(null);
   const endRef = useRef(null);
@@ -616,7 +618,15 @@ export default function PortalChatWorkspace({ viewerRole }) {
                       <span style={{ padding: '10px 16px', borderRadius: 999, background: 'rgba(255,234,234,0.96)', color: '#b63636', fontWeight: 700, fontSize: 16 }}>Urgent</span>
                     )}
                     {selectedConversation.latestAppointmentStatus === 'confirmed' && selectedConversation.latestRoomId ? (
-                      <Link href={`/video/${selectedConversation.latestRoomId}`} className="action-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.88)', textDecoration: 'none', fontSize: 16 }}><PhoneCall size={20} />Call</Link>
+                      <button 
+                        type="button" 
+                        onClick={() => initiateCall(selectedConversation.counterpart, { id: selectedConversation.counterpart.id, name: selectedConversation.counterpart.name }, selectedConversation.latestRoomId)} 
+                        className="action-btn" 
+                        disabled={callState !== 'idle'}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.88)', fontSize: 16, cursor: 'pointer' }}
+                      >
+                        <PhoneCall size={20} />Call
+                      </button>
                     ) : (
                       <button type="button" disabled style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.34)', fontSize: 16 }}><PhoneCall size={20} />Call</button>
                     )}
