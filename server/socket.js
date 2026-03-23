@@ -10,11 +10,18 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: function(origin, callback) {
+      if (!origin) return callback(null, true);
       const allowed = [
         'http://localhost:3000',
         process.env.CLIENT_URL,
       ].filter(Boolean);
-      if (!origin || allowed.some(o => origin.startsWith(o))) {
+
+      const isLocalNetwork = 
+        origin.startsWith('http://192.168.') || 
+        origin.startsWith('http://10.') || 
+        origin.startsWith('http://172.');
+
+      if (allowed.some(o => origin.startsWith(o)) || isLocalNetwork) {
         callback(null, true);
       } else {
         console.warn(`⚠️  CORS blocked origin: ${origin}`);
