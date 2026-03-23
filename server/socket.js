@@ -14,14 +14,16 @@ const io = new Server(server, {
       const allowed = [
         'http://localhost:3000',
         process.env.CLIENT_URL,
-      ].filter(Boolean);
+      ].filter(Boolean).map(url => url.replace(/\/$/, '').trim());
+
+      const normalizedOrigin = origin.replace(/\/$/, '').trim();
 
       const isLocalNetwork = 
         origin.startsWith('http://192.168.') || 
         origin.startsWith('http://10.') || 
         origin.startsWith('http://172.');
 
-      if (allowed.some(o => origin.startsWith(o)) || isLocalNetwork) {
+      if (!origin || allowed.some(o => normalizedOrigin.startsWith(o)) || isLocalNetwork) {
         callback(null, true);
       } else {
         console.warn(`⚠️  CORS blocked origin: ${origin}`);
