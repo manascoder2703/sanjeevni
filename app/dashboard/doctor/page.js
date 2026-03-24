@@ -3,14 +3,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+// Note: Socket is now obtained via useNotifications() inside the component
 import {
   Calendar, Video, CheckCircle, XCircle, Clock,
   Users, Sparkles, X, Loader2, Activity, Stethoscope,
-  Star, AlertCircle
+  Star, AlertCircle, Coffee
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getCallWindowStatus, secondsUntilWindow } from '@/lib/callWindow';
 import { useNotifications } from '@/context/NotificationContext';
+import PlanYourDayModal from '@/components/PlanYourDayModal';
+import BusyDurationModal from '@/components/BusyDurationModal';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -152,6 +155,43 @@ export default function DoctorDashboard() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [doctorProfile, setDoctorProfile] = useState(null);
   const [isOnline, setIsOnline]         = useState(false);
+  const [showPlan, setShowPlan]         = useState(false);
+  const [isPlanned, setIsPlanned]       = useState(false);
+  const [showReminder, setShowReminder] = useState(false);
+  const [isManuallyOffline, setIsManuallyOffline] = useState(false);
+  const [showBusyModal, setShowBusyModal] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  const nowValue = currentTime;
+  const todayVal = `${nowValue.getFullYear()}-${String(nowValue.getMonth() + 1).padStart(2, '0')}-${String(nowValue.getDate()).padStart(2, '0')}`;
+  const nowMin   = nowValue.getHours() * 60 + nowValue.getMinutes();
+
+  const isInScheduledBusy = doctorProfile?.busyRanges?.some(r => {
+    if (r.date !== todayVal) return false;
+    const [sH, sM] = r.startTime.split(':').map(Number);
+    const [eH, eM] = r.endTime.split(':').map(Number);
+    const startM = sH * 60 + sM;
+    const endM   = eH * 60 + eM;
+    return nowMin >= startM && nowMin <= endM;
+  }) || false;
+
+  const effectiveBusy = isManuallyOffline || isInScheduledBusy;
+
+  // Keep current time updated for scheduled busy status
+  useEffect(() => {
+    const t = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Broadcast status to socket when manual or scheduled busy state changes
+  useEffect(() => {
+    if (!socket || !user?.id) return;
+    if (effectiveBusy) {
+      socket.emit('doctor-offline', { userId: user.id });
+    } else {
+      socket.emit('doctor-online', { userId: user.id });
+    }
+  }, [effectiveBusy, socket, user?.id]);
 
   const fetchAppointments = useCallback(async () => {
     try {
@@ -179,7 +219,6 @@ export default function DoctorDashboard() {
     if (!socket) return;
 
     const handleConnect = () => {
-      socket.emit('doctor-online', { userId: user.id });
       setIsOnline(true);
     };
 
@@ -197,6 +236,143 @@ export default function DoctorDashboard() {
       socket.off('new-notification', fetchAppointments);
     };
   }, [user, authLoading, fetchAppointments, fetchProfile, socket]);
+
+  // ── Plan Your Day Persistence & Reminders ──────────────────────────────────
+  useEffect(() => {
+    if (!user?.id) return;
+    const uid = user.id;
+    const today = new Date().toDateString();
+    const savedDate = localStorage.getItem(`doctor_plan_date_${uid}`);
+    if (savedDate !== today) {
+      localStorage.removeItem(`doctor_daily_goal_${uid}`);
+      localStorage.removeItem(`doctor_completed_habits_${uid}`);
+      localStorage.removeItem(`doctor_plan_completed_${uid}`);
+      localStorage.setItem(`doctor_plan_date_${uid}`, today);
+      setIsPlanned(false);
+    } else {
+      const savedPlanned = localStorage.getItem(`doctor_plan_completed_${uid}`);
+      if (savedPlanned === 'true') setIsPlanned(true);
+    }
+
+    // Manual Offline Persistence
+    const savedManualStatus = localStorage.getItem(`doctor_manual_offline_${uid}`);
+    if (savedManualStatus === 'true') {
+      setIsManuallyOffline(true);
+    }
+
+    // Hourly Reminder Logic
+    const checkReminder = () => {
+        const uid = user.id;
+        const now = Date.now();
+        const lastTime = Number(localStorage.getItem(`doctor_last_reminder_${uid}`)) || 0;
+        const ONE_HOUR = 60 * 60 * 1000;
+
+        // Show reminder if plan is completed AND 1 hour has passed
+        if (localStorage.getItem(`doctor_plan_completed_${uid}`) === 'true' && (now - lastTime >= ONE_HOUR)) {
+            setShowReminder(true);
+            localStorage.setItem(`doctor_last_reminder_${uid}`, now.toString());
+            // Hide after 8 seconds
+            setTimeout(() => setShowReminder(false), 8000);
+        }
+    };
+
+    // Initial check on mount
+    checkReminder();
+
+    const reminderInterval = setInterval(checkReminder, 60 * 1000); // Check every minute
+    return () => clearInterval(reminderInterval);
+  }, [user?.id]);
+
+  const handlePlanComplete = () => {
+    if (!user?.id) return;
+    setIsPlanned(true);
+    localStorage.setItem(`doctor_plan_completed_${user.id}`, 'true');
+    toast.success('Day planned successfully!');
+  };
+
+  const toggleAvailability = useCallback(async () => {
+    if (!socket || !user?.id) {
+      toast.error('Signaling connection not ready. Please wait a moment.');
+      return;
+    }
+
+    // If currently Available (NOT busy manually and NOT in a scheduled range)
+    if (!effectiveBusy) {
+      // Check for active confirmed appointments (window is 'open')
+      const activeApt = appointments.find(apt =>
+        apt.status === 'confirmed' && getCallWindowStatus(apt) === 'open'
+      );
+
+      if (activeApt) {
+        toast.error(`You can't go offline as you have a confirmed appointment with ${activeApt.patientId?.name || 'a patient'} at ${activeApt.timeSlot}`, {
+          duration: 5000,
+          style: { border: '1px solid #fb7185', background: '#050608', color: '#fff' }
+        });
+        return;
+      }
+
+      setShowBusyModal(true);
+      return;
+    }
+
+    // If currently Busy (for any reason), clicking toggles back to Available
+    try {
+      // 1. Clear manual offline
+      setIsManuallyOffline(false);
+      localStorage.setItem(`doctor_manual_offline_${user.id}`, 'false');
+      
+      // 2. Clear any ACTIVE scheduled busy ranges (early return)
+      const nowVal = new Date();
+      const today = nowVal.toISOString().split('T')[0];
+      const nowM  = nowVal.getHours() * 60 + nowVal.getMinutes();
+
+      const activeRange = doctorProfile?.busyRanges?.find(r => {
+        if (r.date !== today) return false;
+        const [sH, sM] = r.startTime.split(':').map(Number);
+        const [eH, eM] = r.endTime.split(':').map(Number);
+        return nowM >= (sH * 60 + sM) && nowM <= (eH * 60 + eM);
+      });
+
+      if (activeRange) {
+        await fetch('/api/profile/doctor/busy', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ date: activeRange.date, startTime: activeRange.startTime })
+        });
+        fetchProfile(); // Refresh to clear slots
+      }
+
+      socket.emit('doctor-online', { userId: user.id });
+      toast.success('Status set to Available (Early Return)');
+    } catch (err) {
+      toast.error('Failed to reset status');
+    }
+  }, [socket, user?.id, effectiveBusy, appointments, doctorProfile, fetchProfile]);
+
+  const handleBusyConfirm = async ({ date, startTime, endTime }) => {
+    if (!socket || !user?.id) return;
+    
+    try {
+      const res = await fetch('/api/profile/doctor/busy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ date, startTime, endTime })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to set busy duration');
+      
+      // We no longer set setIsManuallyOffline(true) here because the user wants it to be scheduled
+      // Instead, we just show success and the slots will be blocked in the patient UI immediately.
+      fetchProfile(); // Refresh profile to get updated busyRanges
+      
+      const displayDate = new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      toast.success(`Scheduled Busy Duration: ${displayDate} (${startTime} - ${endTime})`);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
 
   const updateStatus = async (id, status) => {
     try {
@@ -275,10 +451,34 @@ export default function DoctorDashboard() {
             Dr. {firstName} <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span> <span style={{ color: '#3b82f6' }}>Doctor Portal</span>
           </h1>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '99px', background: isOnline ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)', border: `0.5px solid ${isOnline ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
-          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isOnline ? '#4ade80' : 'rgba(255,255,255,0.2)' }} />
-          <span style={{ fontSize: '12px', fontWeight: '600', color: isOnline ? '#4ade80' : 'rgba(255,255,255,0.3)' }}>{isOnline ? 'Online' : 'Offline'}</span>
-        </div>
+        <button 
+          onClick={toggleAvailability}
+          style={{ 
+            display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', 
+            borderRadius: '99px', background: (isOnline && !effectiveBusy) ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)', 
+            border: `0.5px solid ${(isOnline && !effectiveBusy) ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.1)'}`,
+            cursor: 'pointer', transition: 'all 0.3s ease', outline: 'none'
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.boxShadow = (isOnline && !effectiveBusy) 
+              ? '0 0 15px rgba(74,222,128,0.2)' 
+              : '0 0 15px rgba(255,255,255,0.1)';
+            e.currentTarget.style.borderColor = (isOnline && !effectiveBusy) 
+              ? 'rgba(74,222,128,0.5)' 
+              : 'rgba(255,255,255,0.3)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.borderColor = (isOnline && !effectiveBusy) 
+              ? 'rgba(34,197,94,0.25)' 
+              : 'rgba(255,255,255,0.1)';
+          }}
+        >
+          <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: (isOnline && !effectiveBusy) ? '#4ade80' : '#fb7185' }} />
+          <span style={{ fontSize: '12px', fontWeight: '600', color: (isOnline && !effectiveBusy) ? '#4ade80' : 'rgba(255,255,255,0.3)' }}>
+            {(isOnline && !effectiveBusy) ? 'Available' : 'Busy (Offline)'}
+          </span>
+        </button>
       </div>
 
       {/* Stats */}
@@ -526,7 +726,103 @@ export default function DoctorDashboard() {
           </div>
         </div>
       )}
+
+      {/* Plan Your Day */}
+      <PlanTrigger onClick={() => setShowPlan(true)} isPlanned={isPlanned} />
+      <PlanYourDayModal 
+        isOpen={showPlan} 
+        onClose={() => setShowPlan(false)} 
+        appointments={todayAppointments.filter(a => a.status === 'confirmed')}
+        doctorName={user?.name || 'Doctor'}
+        isPlanned={isPlanned}
+        onPlanComplete={handlePlanComplete}
+        userId={user?.id}
+      />
+
+      {/* Busy Duration Modal */}
+      <BusyDurationModal 
+        isOpen={showBusyModal}
+        onClose={() => setShowBusyModal(false)}
+        onConfirm={handleBusyConfirm}
+        doctorName={user?.name}
+      />
+
+      {/* Hourly Review Reminder Slider */}
+      <ReviewReminder show={showReminder} onClick={() => setShowPlan(true)} />
     </div>
+  );
+}
+
+// ─── Floating 'Plan Your Day' Button ─────────────────────────────────────────
+
+function PlanTrigger({ onClick, isPlanned }) {
+  if (isPlanned) {
+    return (
+      <button 
+        disabled
+        style={{ 
+          position: 'fixed', bottom: 30, right: 30, zIndex: 50,
+          display: 'flex', alignItems: 'center', gap: 10, padding: '14px 22px', 
+          borderRadius: 20, border: '1px solid rgba(255,255,255,0.2)', 
+          background: 'linear-gradient(135deg, #e5e7eb, #9ca3af, #e5e7eb)', color: '#000', 
+          fontWeight: 900, boxShadow: '0 0 30px rgba(192,192,192,0.4)',
+          cursor: 'default', outline: 'none'
+        }}
+      >
+        <CheckCircle size={18} />
+        <span>Day Planned</span>
+      </button>
+    );
+  }
+
+  return (
+    <button 
+      onClick={onClick}
+      style={{ 
+        position: 'fixed', bottom: 30, right: 30, zIndex: 50,
+        display: 'flex', alignItems: 'center', gap: 10, padding: '14px 22px', 
+        borderRadius: 20, border: 'none', background: '#fff', color: '#000', 
+        fontWeight: 900, boxShadow: '0 10px 30px rgba(0,0,0,0.3)', cursor: 'pointer',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        outline: 'none'
+      }}
+      onMouseEnter={e => { 
+        e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
+        e.currentTarget.style.boxShadow = '0 15px 40px rgba(255,255,255,0.4)';
+      }}
+      onMouseLeave={e => { 
+        e.currentTarget.style.transform = 'translateY(0) scale(1)';
+        e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.3)';
+      }}
+    >
+      <Coffee size={18} fill="#000" />
+      <span>Plan Your Day</span>
+    </button>
+  );
+}
+
+// ─── Hourly Review Reminder Component ─────────────────────────────────────────
+
+function ReviewReminder({ show, onClick }) {
+  return (
+    <button 
+      onClick={onClick}
+      style={{ 
+        position: 'fixed', bottom: 100, left: 0, zIndex: 100,
+        display: 'flex', alignItems: 'center', gap: 12, padding: '16px 24px', 
+        borderRadius: '0 20px 20px 0', border: 'none', background: '#000', 
+        color: '#fff', borderRight: '2px solid #fff',
+        boxShadow: '10px 0 30px rgba(0,0,0,0.5)', cursor: 'pointer',
+        transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)',
+        transform: show ? 'translateX(0)' : 'translateX(-100%)',
+        outline: 'none'
+      }}
+      onMouseEnter={e => e.currentTarget.style.background = '#111'}
+      onMouseLeave={e => e.currentTarget.style.background = '#000'}
+    >
+      <Sparkles size={16} color="#fff" />
+      <span style={{ fontSize: '13px', fontWeight: '800', letterSpacing: '0.05em' }}>Review your day plan</span>
+    </button>
   );
 }
 

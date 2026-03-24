@@ -106,6 +106,8 @@ export function AuthProvider({ children }) {
       const normalizedUser = normalizeUserShape(data.user);
       setUser(normalizedUser);
       localStorage.setItem('sanjeevni_user', JSON.stringify(normalizedUser));
+      // Availability reset
+      localStorage.removeItem(`doctor_manual_offline_${normalizedUser.id}`);
       return { user: normalizedUser };
     } catch (error) {
       console.error('Login fetch error:', error);
@@ -140,6 +142,8 @@ export function AuthProvider({ children }) {
       const normalizedUser = normalizeUserShape(data.user);
       setUser(normalizedUser);
       localStorage.setItem('sanjeevni_user', JSON.stringify(normalizedUser));
+      // Availability reset
+      localStorage.removeItem(`doctor_manual_offline_${normalizedUser.id}`);
       return { user: normalizedUser };
     } catch (error) {
       console.error('Registration error:', error);
@@ -165,6 +169,8 @@ export function AuthProvider({ children }) {
       const normalizedUser = normalizeUserShape(data.user);
       setUser(normalizedUser);
       localStorage.setItem('sanjeevni_user', JSON.stringify(normalizedUser));
+      // Reset availability on fresh OTP verification
+      localStorage.removeItem(`doctor_manual_offline_${normalizedUser.id}`);
       setPendingOTP(null);
       setLoading(false); 
       return { user: normalizedUser };
@@ -208,6 +214,18 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     if (session) await nextAuthSignOut({ redirect: false });
     await fetch('/api/auth/logout', { method: 'POST' });
+    // Clear doctor manual offline status for this user
+    if (user?.id) {
+        localStorage.removeItem(`doctor_manual_offline_${user.id}`);
+    } else {
+        // Fallback: clear all doctor manual status keys if we've already lost the ID
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('doctor_manual_offline_')) {
+                localStorage.removeItem(key);
+            }
+        });
+    }
+
     localStorage.removeItem('sanjeevni_user');
     setPendingOTP(null);
     window.location.href = '/';

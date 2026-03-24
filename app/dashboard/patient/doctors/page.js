@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { useNotifications } from '@/context/NotificationContext';
-import { Search, ArrowRight, Star, Stethoscope, SlidersHorizontal, X } from 'lucide-react';
+import { Search, Star, Stethoscope, SlidersHorizontal, X, PhoneOff } from 'lucide-react';
 import Link from 'next/link';
 
 const specialties = [
@@ -68,13 +68,11 @@ export default function FindDoctors() {
   const [showFilters, setShowFilters]       = useState(false);
   const [feeRange, setFeeRange]             = useState(5000);
 
-  const { lastRatingUpdate } = useNotifications();
+  const { lastRatingUpdate, doctorPresence } = useNotifications();
 
-  useEffect(() => { fetchDoctors(); }, [selectedSpecialty]);
-
-  // Real-time rating update listener
+  useEffect(() => { fetchDoctors(); }, [selectedSpecialty]);  // Real-time status update listener for rating and reviews
   useEffect(() => {
-    if (lastRatingUpdate && doctors.length > 0) {
+    if (lastRatingUpdate) {
       setDoctors(prev => prev.map(doc => {
         if (doc._id === lastRatingUpdate.doctorId) {
           return {
@@ -87,6 +85,7 @@ export default function FindDoctors() {
       }));
     }
   }, [lastRatingUpdate]);
+
   const fetchDoctors = async () => {
     setLoading(true);
     try {
@@ -107,43 +106,44 @@ export default function FindDoctors() {
     } finally {
       setLoading(false);
     }
-  };
+  };  // All filtering and stats should use the combined presence data
+  const { filteredDoctors, onlineCount, avgRating } = useMemo(() => {
+    const list = doctors.map(doc => {
+      const id = typeof doc.userId === 'object' ? doc.userId._id : doc.userId;
+      const presenceStatus = doctorPresence[String(id)];
+      const isOnline = presenceStatus !== undefined ? presenceStatus : doc.isOnline === true;
+      return { ...doc, isOnline };
+    });
 
-  // All filtering happens on the frontend
-  const filteredDoctors = useMemo(() => {
-    return doctors.filter(doc => {
+    const filtered = list.filter(doc => {
       const name = doc.userId?.name || '';
       const spec = doc.specialization || '';
       const bio  = doc.bio || '';
 
-      // 1. Name / specialty / bio search (fuzzy, space-insensitive)
       const matchesSearch = !searchQuery ||
         fuzzyNameMatch(name, searchQuery) ||
         spec.toLowerCase().includes(searchQuery.toLowerCase()) ||
         bio.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // 2. Fee filter
-      const fee = doc.fee || 0;
-      const matchesFee = fee <= feeRange;
-
-      // 3. Online filter
+      const matchesFee = (doc.fee || 0) <= feeRange;
       const matchesOnline = !onlineOnly || doc.isOnline === true;
 
       return matchesSearch && matchesFee && matchesOnline;
     });
-  }, [doctors, searchQuery, feeRange, onlineOnly]);
 
-  const onlineCount = doctors.filter(d => d.isOnline).length;
-  const avgRating   = doctors.length > 0
-    ? (doctors.reduce((s, d) => s + (d.rating || 0), 0) / doctors.length).toFixed(1)
-    : '—';
+    const oCount = list.filter(d => d.isOnline).length;
+    const aRating = list.length > 0
+      ? (list.reduce((s, d) => s + (d.rating || 0), 0) / list.length).toFixed(1)
+      : '0.0';
+
+    return { filteredDoctors: filtered, onlineCount: oCount, avgRating: aRating };
+  }, [doctors, doctorPresence, searchQuery, feeRange, onlineOnly]);
 
   const hasActiveFilters = onlineOnly || feeRange < maxFee;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%', paddingBottom: '80px' }}>
 
-      {/* Header */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 14px', borderRadius: '99px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgba(255,255,255,0.3)' }}>
           <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
@@ -298,7 +298,11 @@ export default function FindDoctors() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
               {filteredDoctors.map(doc => (
-                <DoctorCard key={doc._id} doctor={doc} />
+                <DoctorCard 
+                  key={doc._id} 
+                  doctor={doc} 
+                  presenceStatus={doctorPresence[String(typeof doc.userId === 'object' ? doc.userId._id : doc.userId)]}
+                />
               ))}
             </div>
           </>
@@ -308,7 +312,7 @@ export default function FindDoctors() {
   );
 }
 
-function DoctorCard({ doctor }) {
+function DoctorCard({ doctor, presenceStatus }) {
   const name           = doctor.userId?.name || 'Medical Specialist';
   const { bg, text }   = getAvatarColor(name);
   const initials       = getInitials(name);
@@ -323,8 +327,8 @@ function DoctorCard({ doctor }) {
   // Real rating from doctor.rating
   const rating = doctor.rating > 0 ? Number(doctor.rating).toFixed(1) : '—';
 
-  // Real online status from doctor.isOnline (set by Socket.io)
-  const isOnline = doctor.isOnline === true;
+  // Effective online status: Presence map takes priority over initial DB state
+  const isOnline = presenceStatus !== undefined ? presenceStatus : doctor.isOnline === true;
 
   return (
     <div
@@ -386,15 +390,21 @@ function DoctorCard({ doctor }) {
         ))}
       </div>
 
-      {/* Book button */}
-      <Link
-        href={`/dashboard/patient/doctors/${doctor._id}`}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '0.5px solid rgba(255,255,255,0.09)', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none', transition: 'all 0.2s' }}
-        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; }}
-      >
-        Book Appointment <ArrowRight size={14} />
-      </Link>
+      {/* Action Area */}
+      <div style={{ marginTop: 'auto' }}>
+        <Link
+          href={`/dashboard/patient/doctors/${doctor._id}`}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', borderRadius: '12px',
+            background: '#fff', color: '#000', fontSize: '13px', fontWeight: '800', textDecoration: 'none', transition: 'all 0.2s',
+            boxShadow: '0 4px 15px rgba(255,255,255,0.1)'
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(255,255,255,0.15)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(255,255,255,0.1)'; }}
+        >
+          Book Appointment
+        </Link>
+      </div>
     </div>
   );
 }

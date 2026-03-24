@@ -23,26 +23,46 @@ export function CallProvider({ children }) {
 
   const pcRef = useRef(null);
   const audioRef = useRef(null);
+  const stateRef = useRef({ callState, roomId, localStream, remoteUser, startTime, isIncoming });
 
-  const logCall = useCallback(async (type, duration = null) => {
-    if (!roomId || !stateRef.current.remoteUser) return;
+  // Sync stateRef
+  useEffect(() => {
+    stateRef.current = { callState, roomId, localStream, remoteUser, startTime, isIncoming };
+  }, [callState, roomId, localStream, remoteUser, startTime, isIncoming]);
+
+  const logCall = useCallback(async (type, duration = null, targetRoomId = null, targetRemoteUser = null) => {
+    const rId = targetRoomId || roomId;
+    const rUser = targetRemoteUser || stateRef.current.remoteUser;
+    
+    if (!rId || !rUser) {
+      console.warn('⚠️ Skipping logCall: missing roomId or remoteUser', { rId, hasUser: !!rUser });
+      return;
+    }
     
     let text = '';
+    let status = 'completed';
+
     if (type === 'ended') {
       const mins = Math.floor(duration / 60);
       const secs = duration % 60;
       const durationStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
       text = `Call ended • ${durationStr}`;
+      status = 'completed';
     } else if (type === 'missed') {
-      text = isIncoming ? 'Missed call' : 'Call not answered';
+      text = isIncoming ? 'Missed call' : 'No answer';
+      status = 'missed';
+    } else if (type === 'cancelled') {
+      text = 'No answer';
+      status = 'cancelled';
     } else if (type === 'rejected') {
       text = isIncoming ? 'Call rejected' : 'Call declined';
+      status = isIncoming ? 'rejected' : 'declined';
     }
 
     if (!text) return;
 
     try {
-      await fetch(`/api/chat/conversations/${roomId}/messages`, {
+      await fetch(`/api/chat/conversations/${rId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -50,7 +70,7 @@ export function CallProvider({ children }) {
           text, 
           kind: 'call',
           callDuration: duration || 0,
-          callStatus: type === 'ended' ? 'completed' : type // 'missed', 'rejected'
+          callStatus: status
         }),
       });
     } catch (err) {
@@ -58,32 +78,33 @@ export function CallProvider({ children }) {
     }
   }, [roomId, isIncoming]);
 
-  // Update audio source when remote stream changes
-  useEffect(() => {
-    if (audioRef.current && remoteStream) {
-      console.log('🔊 Attaching remote stream to audio element');
-      audioRef.current.srcObject = remoteStream;
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(err => {
-          console.warn('⚠️ Audio play promise rejected:', err);
-          // Try to play again or notify user
-        });
-      }
-    }
-  }, [remoteStream]);
-
   // Clean up WebRTC
   const cleanup = useCallback((reason = 'ended') => {
-    // Log call before clearing state
+    // Capture state values before clearing them
     const curState = stateRef.current.callState;
     const curStart = stateRef.current.startTime;
+    const curRoomId = stateRef.current.roomId;
+    const curRemoteUser = stateRef.current.remoteUser;
+    const curIsIncoming = stateRef.current.isIncoming; // Track if we were the receiver
 
-    if (curState === 'connected' && curStart) {
-      const duration = Math.floor((Date.now() - curStart) / 1000);
-      logCall('ended', duration);
-    } else if (curState === 'ringing' || curState === 'offering') {
-      logCall(reason === 'rejected' ? 'rejected' : 'missed');
+    // CRITICAL: Only the initiator (!curIsIncoming) logs to the chat/database
+    // to prevent duplicate logs and role-reversed messages.
+    if (!curIsIncoming) {
+      if (curState === 'connected' && curStart) {
+        const duration = Math.floor((Date.now() - curStart) / 1000);
+        logCall('ended', duration, curRoomId, curRemoteUser);
+      } else if (curState === 'ringing' || curState === 'offering') {
+        if (reason === 'missed') {
+          // 3-min timeout reached
+          logCall('missed', null, curRoomId, curRemoteUser);
+        } else if (reason === 'rejected') {
+          // Manually rejected by receiver
+          logCall('rejected', null, curRoomId, curRemoteUser);
+        } else {
+          // Manually cancelled by caller before answer
+          logCall('cancelled', null, curRoomId, curRemoteUser);
+        }
+      }
     }
 
     if (pcRef.current) {
@@ -104,7 +125,6 @@ export function CallProvider({ children }) {
     setStartTime(null);
   }, [localStream, logCall]);
 
-  // Initialize WebRTC PeerConnection
   const createPC = useCallback((stream) => {
     const pc = new RTCPeerConnection({
       iceServers: [
@@ -156,10 +176,31 @@ export function CallProvider({ children }) {
     return pc;
   }, [socket, cleanup]);
 
-  const stateRef = useRef({ callState, roomId, localStream, remoteUser, startTime });
+  // Auto-hangup after 3 minutes if no answer
   useEffect(() => {
-    stateRef.current = { callState, roomId, localStream, remoteUser, startTime };
-  }, [callState, roomId, localStream, remoteUser, startTime]);
+    let timeoutId;
+    if (callState === 'offering' || callState === 'ringing') {
+      timeoutId = setTimeout(() => {
+        console.log('⏰ Call timeout reached (3 min). Marking as missed.');
+        cleanup('missed');
+      }, 3 * 60 * 1000); 
+    }
+    return () => { if (timeoutId) clearTimeout(timeoutId); };
+  }, [callState, cleanup]);
+
+  // Update audio source when remote stream changes
+  useEffect(() => {
+    if (audioRef.current && remoteStream) {
+      console.log('🔊 Attaching remote stream to audio element');
+      audioRef.current.srcObject = remoteStream;
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => {
+          console.warn('⚠️ Audio play promise rejected:', err);
+        });
+      }
+    }
+  }, [remoteStream]);
 
   // Handle Signaling
   useEffect(() => {

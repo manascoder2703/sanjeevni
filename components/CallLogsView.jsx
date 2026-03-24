@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneCall, Search } from 'lucide-react';
+import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, PhoneCall, Search, PhoneOff, Trash2, CheckSquare, Square } from 'lucide-react';
 import { useCall } from '@/context/CallContext';
+import { useNotifications } from '@/context/NotificationContext';
 import toast from 'react-hot-toast';
 
 const ACCENT = '#18b6a2';
@@ -27,8 +28,9 @@ function StatusBadge({ status }) {
   const map = {
     completed: { bg: 'rgba(24,182,162,0.1)', border: 'rgba(24,182,162,0.3)', color: '#18b6a2', label: 'Completed' },
     missed:    { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.3)',  color: '#fb7185', label: 'Missed' },
-    rejected:  { bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.3)', color: '#fbbf24', label: 'Rejected' },
-    declined:  { bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.3)', color: '#fbbf24', label: 'Declined' },
+    rejected:  { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.3)',  color: '#fb7185', label: 'Rejected' },
+    declined:  { bg: 'rgba(239,68,68,0.1)',  border: 'rgba(239,68,68,0.3)',  color: '#fb7185', label: 'Declined' },
+    cancelled: { bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.3)', color: '#60a5fa', label: 'No answer' },
   };
   const s = map[status] || map.missed;
   return (
@@ -39,8 +41,9 @@ function StatusBadge({ status }) {
 }
 
 function DirectionIcon({ direction, status }) {
-  const isMissed = status !== 'completed';
+  const isMissed = ['missed', 'rejected', 'declined'].includes(status);
   const isIn = direction === 'incoming';
+  
   const bg = isMissed ? 'rgba(239,68,68,0.1)' : isIn ? 'rgba(24,182,162,0.1)' : 'rgba(59,130,246,0.1)';
   const color = isMissed ? '#fb7185' : isIn ? '#18b6a2' : '#60a5fa';
   const Icon = isMissed ? PhoneMissed : isIn ? PhoneIncoming : PhoneOutgoing;
@@ -62,6 +65,67 @@ function avatar(name = '') {
   return AVATARS[name.charCodeAt(0) % AVATARS.length] || AVATARS[0];
 }
 
+function ConfirmationModal({ isOpen, onCancel, onConfirm, title, message, isDeleting }) {
+  if (!isOpen) return null;
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+      <div style={{ background: '#000', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 24, width: '100%', maxWidth: 440, padding: 32, boxShadow: '0 25px 60px -12px rgba(0,0,0,0.8)', textAlign: 'center' }}>
+        <div style={{ 
+          width: 80, height: 80, borderRadius: '50%', background: '#000', color: '#fff', 
+          display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px',
+          boxShadow: '0 0 20px rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <Trash2 size={40} style={{ filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.4))' }} />
+        </div>
+        <h2 style={{ color: '#fff', fontSize: 24, fontWeight: 800, margin: '0 0 12px' }}>{title}</h2>
+        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 16, lineHeight: 1.6, margin: '0 0 32px' }}>
+          {message}
+          <br />
+          <strong style={{ color: '#ef4444' }}>This action cannot be undone.</strong>
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <button 
+            onClick={onCancel}
+            disabled={isDeleting}
+            style={{ 
+              padding: '14px', borderRadius: 16, border: 'none', 
+              background: '#fff', color: '#000', fontWeight: 800, cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' 
+            }}
+            onMouseEnter={e => { 
+                e.currentTarget.style.transform = 'scale(1.02)';
+                e.currentTarget.style.boxShadow = '0 0 20px rgba(255,255,255,0.6)';
+            }}
+            onMouseLeave={e => { 
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={onConfirm}
+            disabled={isDeleting}
+            style={{ 
+              padding: '14px', borderRadius: 16, border: 'none', 
+              background: '#fff', color: '#000', fontWeight: 800, cursor: 'pointer', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)' 
+            }}
+            onMouseEnter={e => { 
+              e.currentTarget.style.transform = 'scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 0 20px rgba(255,255,255,0.6)';
+            }}
+            onMouseLeave={e => { 
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete permanently'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const TABS = ['All', 'Incoming', 'Outgoing', 'Missed'];
 
 export default function CallLogsView({ role }) {
@@ -70,6 +134,11 @@ export default function CallLogsView({ role }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isAllDeletion, setIsAllDeletion] = useState(false);
+  const { doctorPresence } = useNotifications();
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -85,7 +154,9 @@ export default function CallLogsView({ role }) {
     }
   }, []);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  useEffect(() => { 
+    fetchLogs(); 
+  }, [fetchLogs]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -107,7 +178,7 @@ export default function CallLogsView({ role }) {
   const stats = useMemo(() => {
     const total = logs.length;
     const completed = logs.filter(l => l.status === 'completed').length;
-    const missed = logs.filter(l => l.status !== 'completed').length;
+    const missed = logs.filter(l => ['missed', 'rejected', 'declined'].includes(l.status)).length;
     const totalSecs = logs.reduce((acc, l) => acc + (l.duration || 0), 0);
     const totalMins = Math.round(totalSecs / 60);
     return { total, completed, missed, talkTime: totalMins > 0 ? `${totalMins}m` : '—' };
@@ -135,6 +206,52 @@ export default function CallLogsView({ role }) {
     initiateCall(log.otherUser, log.conversationId);
   };
 
+  const toggleSelect = (id) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filtered.map(l => l._id)));
+    }
+  };
+
+  const handleDeleteClick = (all = false) => {
+    if (!all && selectedIds.size === 0) return;
+    setIsAllDeletion(all);
+    setShowConfirm(true);
+  };
+
+  const executeDelete = async () => {
+    const all = isAllDeletion;
+    setIsDeleting(true);
+    try {
+      const res = await fetch('/api/calls', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          all,
+          ids: all ? [] : Array.from(selectedIds)
+        }),
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to delete');
+      toast.success(all ? 'Call history cleared' : 'Logs deleted');
+      setSelectedIds(new Set());
+      setShowConfirm(false);
+      fetchLogs();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const card = {
     background: 'rgba(255,255,255,0.02)',
     border: '0.5px solid rgba(255,255,255,0.07)',
@@ -146,8 +263,26 @@ export default function CallLogsView({ role }) {
 
       {/* Header */}
       <div>
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.2)', marginBottom: 4 }}>
-          {role === 'doctor' ? 'Doctor Portal' : 'Patient Portal'}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.2)' }}>
+            {role === 'doctor' ? 'Doctor Portal' : 'Patient Portal'}
+          </div>
+          {logs.length > 0 && (
+            <button
+              onClick={() => handleDeleteClick(true)}
+              disabled={isDeleting}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 10,
+                background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
+                color: 'rgba(239,68,68,0.9)', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.12)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.4)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.06)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)'; }}
+            >
+              <Trash2 size={14} />
+              Clear history
+            </button>
+          )}
         </div>
         <h1 style={{ fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: '-0.5px', margin: 0 }}>Call logs</h1>
         <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
@@ -225,10 +360,16 @@ export default function CallLogsView({ role }) {
                 return (
                   <div
                     key={log._id}
-                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: isLast ? 'none' : '0.5px solid rgba(255,255,255,0.05)', transition: 'background 0.15s', cursor: 'default' }}
+                    style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: isLast ? 'none' : '0.5px solid rgba(255,255,255,0.05)', transition: 'background 0.15s', cursor: 'default' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   >
+                    <div 
+                      onClick={() => toggleSelect(log._id)}
+                      style={{ padding: 4, cursor: 'pointer', color: selectedIds.has(log._id) ? ACCENT : 'rgba(255,255,255,0.2)', transition: 'all 0.2s' }}
+                    >
+                      {selectedIds.has(log._id) ? <CheckSquare size={18} /> : <Square size={18} />}
+                    </div>
                     <DirectionIcon direction={log.direction} status={log.status} />
 
                     <div style={{ width: 40, height: 40, borderRadius: '50%', background: av.bg, color: av.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>
@@ -248,18 +389,20 @@ export default function CallLogsView({ role }) {
                       <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 8 }}>{formatDuration(log.duration)}</div>
                       <button
                         onClick={() => onCallAgain(log)}
-                        disabled={callState !== 'idle'}
+                        disabled={callState !== 'idle' || doctorPresence[log.otherUser?.id] === false}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8,
-                          border: `0.5px solid rgba(255,255,255,0.1)`, background: 'rgba(255,255,255,0.04)',
-                          color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 600, cursor: callState !== 'idle' ? 'not-allowed' : 'pointer',
-                          opacity: callState !== 'idle' ? 0.4 : 1, transition: 'all 0.15s',
+                          display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8,
+                          border: `0.5px solid rgba(255,255,255,0.1)`, 
+                          background: (callState === 'idle' && doctorPresence[log.otherUser?.id] !== false) ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
+                          color: (callState === 'idle' && doctorPresence[log.otherUser?.id] !== false) ? '#fff' : 'rgba(255,255,255,0.25)', 
+                          fontSize: 12, fontWeight: 700, 
+                          cursor: (callState === 'idle' && doctorPresence[log.otherUser?.id] !== false) ? 'pointer' : 'not-allowed',
+                          opacity: 1, transition: 'all 0.15s',
                         }}
-                        onMouseEnter={e => { if (callState === 'idle') { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#fff'; }}}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+                        onMouseEnter={e => { if (callState === 'idle' && doctorPresence[log.otherUser?.id] !== false) { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
                       >
-                        <PhoneCall size={13} />
-                        Call again
+                        {doctorPresence[log.otherUser?.id] === false ? <><PhoneOff size={13} /> Busy</> : <><PhoneCall size={13} /> Call again</>}
                       </button>
                     </div>
                   </div>
@@ -269,6 +412,53 @@ export default function CallLogsView({ role }) {
           ))}
         </div>
       )}
+
+      {/* Floating Selection Bar */}
+      {selectedIds.size > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 30, left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.1)', padding: '12px 24px',
+          borderRadius: 24, display: 'flex', alignItems: 'center', gap: 24,
+          boxShadow: '0 20px 50px rgba(0,0,0,0.5)', zIndex: 100, borderBottom: `2px solid ${ACCENT}`
+        }}>
+          <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>
+            {selectedIds.size} selected
+          </div>
+          <div style={{ height: 20, width: 1, background: 'rgba(255,255,255,0.2)' }} />
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleDeleteClick(false)}
+              disabled={isDeleting}
+              style={{
+                background: 'rgba(239,68,68,0.9)', color: '#fff', border: 'none',
+                padding: '8px 18px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+                display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', boxShadow: '0 4px 12px rgba(239,68,68,0.2)'
+              }}
+            >
+              <Trash2 size={14} />
+              Delete items
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ConfirmationModal
+        isOpen={showConfirm}
+        isDeleting={isDeleting}
+        onCancel={() => setShowConfirm(false)}
+        onConfirm={executeDelete}
+        title={isAllDeletion ? 'Clear call history?' : 'Delete selected logs?'}
+        message={isAllDeletion 
+          ? 'This will permanently remove all call logs from your view.' 
+          : `This will permanently remove ${selectedIds.size} selected call logs from your view.`}
+      />
     </div>
   );
 }

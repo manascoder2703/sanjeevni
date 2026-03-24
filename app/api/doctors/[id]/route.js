@@ -44,7 +44,8 @@ export async function GET(request, { params }) {
     const slotStates = {};
     for (const appointment of appointments) {
       const state = appointment.patientId?.toString() === user?.userId ? 'bookedByYou' : 'booked';
-      const keys = appointment.slotKeys?.length ? appointment.slotKeys : getSlotKeysForTimeLabel(appointment.timeSlot);
+      // Fill the entire 60-minute duration starting from the appointment time
+      const keys = getSlotKeysForTimeLabel(appointment.timeSlot);
 
       for (const slotKey of keys) {
         slotStates[slotKeyToTimeLabel(slotKey)] = state;
@@ -53,12 +54,37 @@ export async function GET(request, { params }) {
 
     for (const lock of locks) {
       const state = lock.patientId === user?.userId ? 'lockedByYou' : 'locked';
-      const keys = lock.slotKeys?.length ? lock.slotKeys : getSlotKeysForTimeLabel(lock.timeSlot);
+      // Fill the entire 60-minute duration starting from the lock time
+      const keys = getSlotKeysForTimeLabel(lock.timeSlot);
 
       for (const slotKey of keys) {
         const label = slotKeyToTimeLabel(slotKey);
         if (slotStates[label]) continue;
         slotStates[label] = state;
+      }
+    }
+
+    // Include manually set busy ranges (only if NOT expired for today)
+    if (doctor.busyRanges && doctor.busyRanges.length > 0) {
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+
+      for (const range of doctor.busyRanges) {
+        if (range.date === selectedDate) {
+          // If viewing today, skip checking ranges that have already ended
+          if (selectedDate === todayStr) {
+            const [eH, eM] = range.endTime.split(':').map(Number);
+            const endMin = eH * 60 + eM;
+            if (nowMin > endMin) continue; 
+          }
+
+          for (const slotKey of range.slotKeys) {
+            const label = slotKeyToTimeLabel(slotKey);
+            if (slotStates[label]) continue;
+            slotStates[label] = 'doctorBusy';
+          }
+        }
       }
     }
 

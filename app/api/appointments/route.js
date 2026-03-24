@@ -305,6 +305,16 @@ export async function POST(request) {
       console.warn('Chat sync trigger failed:', chatSyncErr.message);
     }
 
+    // Broadcast the new booking globally
+    try {
+      axios.post(`${SOCKET_SERVER}/internal/broadcast`, {
+        event: 'slot:occupied',
+        data: { doctorId, date, timeSlot, state: 'booked', patientId: user.userId }
+      }).catch(err => console.error('Booking broadcast failed:', err.message));
+    } catch (broadcastErr) {
+      console.warn('Broadcast trigger failed:', broadcastErr.message);
+    }
+
     return NextResponse.json({ message: 'Appointment booked!', appointment }, { status: 201 });
   } catch (error) {
     console.error(error);

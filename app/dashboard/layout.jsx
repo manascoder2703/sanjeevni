@@ -37,7 +37,7 @@ export default function DashboardLayout({ children }) {
   const isCallLogsPage =
     pathname === "/dashboard/doctor/calls" ||
     pathname === "/dashboard/patient/calls"
-  const isFullWidthPage = isChatPage || isCallLogsPage
+  const isFullWidthPage = isChatPage
 
   useEffect(() => {
     // Only proceed once loading from context is finished
@@ -84,7 +84,7 @@ export default function DashboardLayout({ children }) {
         <SidebarProvider>
           <CommandPalette />
           <AppSidebar />
-          <SidebarInset className="bg-[#000000] text-white relative overflow-hidden flex flex-col min-h-screen">
+          <SidebarInset className={`bg-[#000000] text-white relative overflow-hidden flex flex-col ${isFullWidthPage ? 'h-screen' : 'min-h-screen'}`}>
             <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-0"
               style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
             <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-blue-500/5 blur-[120px] pointer-events-none z-0"></div>
@@ -127,7 +127,7 @@ export default function DashboardLayout({ children }) {
             </header>
 
             <div
-              className={`flex-1 relative z-10 custom-scrollbar flex flex-col min-h-0 ${isFullWidthPage ? "items-stretch overflow-y-auto" : "items-center overflow-y-auto"}`}
+              className={`flex-1 relative z-10 custom-scrollbar flex flex-col min-h-0 ${isFullWidthPage ? "items-stretch overflow-hidden" : "items-center overflow-y-auto"}`}
               style={{
                 paddingLeft: isFullWidthPage ? '0' : '2.5rem',
                 paddingRight: isFullWidthPage ? '0' : '2.5rem',

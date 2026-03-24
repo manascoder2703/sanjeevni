@@ -28,7 +28,7 @@ const CallLogSchema = new mongoose.Schema({
   },
   status: { 
     type: String, 
-    enum: ['completed', 'missed', 'rejected', 'declined'], 
+    enum: ['completed', 'missed', 'rejected', 'declined', 'cancelled'], 
     default: 'completed' 
   },
   duration: { 
@@ -45,6 +45,14 @@ const CallLogSchema = new mongoose.Schema({
   conversationId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Conversation' 
+  },
+  deletedByDoctor: {
+    type: Boolean,
+    default: false
+  },
+  deletedByPatient: {
+    type: Boolean,
+    default: false
   }
 }, { timestamps: true });
 
@@ -52,4 +60,8 @@ const CallLogSchema = new mongoose.Schema({
 CallLogSchema.index({ doctorUserId: 1, createdAt: -1 });
 CallLogSchema.index({ patientUserId: 1, createdAt: -1 });
 
-export default mongoose.models.CallLog || mongoose.model('CallLog', CallLogSchema);
+if (mongoose.models.CallLog) {
+  delete mongoose.models.CallLog;
+}
+
+export default mongoose.model('CallLog', CallLogSchema);

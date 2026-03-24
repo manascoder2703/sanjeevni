@@ -7,16 +7,24 @@ import toast from 'react-hot-toast';
 import { useCall } from '@/context/CallContext';
 import {
   CalendarPlus,
+  ChevronRight,
   FileText,
+  Mic,
   Paperclip,
   Phone,
   PhoneCall,
+  PhoneIncoming,
+  PhoneOutgoing,
+  PhoneMissed,
+  PhoneOff,
   Search,
   Send,
   ShieldAlert,
+  Square,
   TestTubeDiagonal,
   Trash2,
   UserRound,
+  Volume2,
   X,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -86,6 +94,66 @@ function addMessageIfMissing(messages = [], nextMessage) {
   return [...messages, nextMessage];
 }
 
+function AudioPlayer({ src, mine }) {
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const audioRef = useRef(null);
+
+  const toggle = () => {
+    if (playing) audioRef.current.pause();
+    else audioRef.current.play();
+    setPlaying(!playing);
+  };
+
+  const onTimeUpdate = () => {
+    if (audioRef.current) {
+      const p = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+      setProgress(p || 0);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 200, padding: '4px 0' }}>
+      <audio ref={audioRef} src={src} onTimeUpdate={onTimeUpdate} onEnded={() => setPlaying(false)} hidden />
+      <button 
+        type="button"
+        onClick={toggle}
+        style={{ 
+          width: 44, height: 44, borderRadius: '50%', 
+          background: 'rgba(255,255,255,0.15)', border: 'none', 
+          color: 'white', display: 'flex', alignItems: 'center', 
+          justifyContent: 'center', cursor: 'pointer',
+          transition: 'all 0.2s ease'
+        }}
+      >
+        {playing ? <Square size={16} fill="white" /> : <Volume2 size={20} />}
+      </button>
+      <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.12)', borderRadius: 3, position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', inset: '0 auto 0 0', width: `${progress}%`, background: 'white', borderRadius: 3, transition: 'width 0.1s linear' }} />
+      </div>
+    </div>
+  );
+}
+
+function Waveform({ levels = [] }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 3, height: 32, padding: '0 8px' }}>
+      {levels.map((v, i) => (
+        <div 
+          key={i} 
+          style={{ 
+            width: 3, 
+            height: Math.max(4, v * 100) + '%', 
+            background: 'rgba(255,255,255,0.85)', 
+            borderRadius: 2,
+            transition: 'height 0.08s ease'
+          }} 
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function PortalChatWorkspace({ viewerRole }) {
   const { user } = useAuth();
   const [conversations, setConversations] = useState([]);
@@ -102,6 +170,20 @@ export default function PortalChatWorkspace({ viewerRole }) {
   const [showProfile, setShowProfile] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Voice recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [visualizerData, setVisualizerData] = useState(Array(20).fill(0.05));
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
+  const shouldSendRef = useRef(false);
+  const durationRef = useRef(0);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const animationFrameRef = useRef(null);
 
   const { socket } = useNotifications();
   const { initiateCall, callState } = useCall();
@@ -133,11 +215,8 @@ export default function PortalChatWorkspace({ viewerRole }) {
         });
         return merged;
       });
-      setSelectedId((current) => {
-        if (current && next.some((item) => item._id === current)) return current;
-        if (current && !next.some((item) => item._id === current)) return null;
-         return null;
-      });
+      // We no longer reset selectedId here to prevent the chat window from closing
+      // during background sidebar refreshes or real-time updates.
     } catch (error) {
       toast.error(error.message || 'Failed to load chats');
     } finally {
@@ -222,17 +301,12 @@ export default function PortalChatWorkspace({ viewerRole }) {
       setPresence((current) => ({ ...current, [userId]: isOnline }));
     };
 
-    const handleConversationUpdated = ({ conversationId } = {}) => {
+    const handleDoctorStatusChanged = ({ doctorId, isOnline }) => {
+      setPresence((current) => ({ ...current, [doctorId]: isOnline }));
+    };
+
+    const handleConversationUpdated = () => {
       fetchConversations();
-      if (conversationId && conversationId === selectedRef.current) {
-        setTimeout(() => {
-          setSelectedId((current) => {
-            if (current !== conversationId) return current;
-            setSelectedConversation(null);
-            return null;
-          });
-        }, 500);
-      }
     };
 
     const handleChatMessage = ({ conversationId, message: nextMessage }) => {
@@ -266,6 +340,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
 
     socket.on('presence:snapshot', handlePresenceSnapshot);
     socket.on('presence:changed', handlePresenceChanged);
+    socket.on('doctor:status-changed', handleDoctorStatusChanged);
     socket.on('chat:conversation-updated', handleConversationUpdated);
     socket.on('chat:message', handleChatMessage);
     socket.on('chat:typing', handleChatTyping);
@@ -275,6 +350,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
       if (selectedRef.current) socket.emit('chat:leave', { conversationId: selectedRef.current });
       socket.off('presence:snapshot', handlePresenceSnapshot);
       socket.off('presence:changed', handlePresenceChanged);
+      socket.off('doctor:status-changed', handleDoctorStatusChanged);
       socket.off('chat:conversation-updated', handleConversationUpdated);
       socket.off('chat:message', handleChatMessage);
       socket.off('chat:typing', handleChatTyping);
@@ -360,7 +436,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
     typingTimerRef.current = setTimeout(() => emitTyping(false), 1200);
   };
 
-  const sendMessage = useCallback(async (overrideText, kind = 'text') => {
+  const sendMessage = useCallback(async (overrideText, kind = 'text', voiceDuration = 0) => {
     const text = (typeof overrideText === 'string' ? overrideText : message).trim();
     if (!text || !selectedId) return;
 
@@ -374,6 +450,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
       _id: tempId,
       text,
       kind,
+      voiceDuration,
       mine: true,
       senderId: String(user?.id),
       senderRole: viewerRole,
@@ -393,7 +470,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ text, kind }),
+        body: JSON.stringify({ text, kind, voiceDuration }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send message');
@@ -420,6 +497,111 @@ export default function PortalChatWorkspace({ viewerRole }) {
       setSending(false);
     }
   }, [emitTyping, fetchConversations, message, selectedId, user?.id, viewerRole]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      // Audio visualizer setup
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      source.connect(analyser);
+      
+      audioContextRef.current = audioCtx;
+      analyserRef.current = analyser;
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const updateVisualizer = () => {
+        analyser.getByteFrequencyData(dataArray);
+        const levels = [];
+        for (let i = 0; i < 20; i++) {
+          levels.push(dataArray[i % bufferLength] / 255);
+        }
+        setVisualizerData(levels);
+        animationFrameRef.current = requestAnimationFrame(updateVisualizer);
+      };
+      animationFrameRef.current = requestAnimationFrame(updateVisualizer);
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (audioChunksRef.current.length > 0 && shouldSendRef.current) {
+          sendVoiceMessage(audioBlob, durationRef.current);
+        }
+        stream.getTracks().forEach(track => track.stop());
+        if (audioCtx.state !== 'closed') audioCtx.close();
+        cancelAnimationFrame(animationFrameRef.current);
+      };
+
+      shouldSendRef.current = true;
+      durationRef.current = 0;
+      recorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        durationRef.current += 1;
+        setRecordingDuration(durationRef.current);
+      }, 1000);
+    } catch (err) {
+      console.error('Recording error:', err);
+      toast.error('Could not access microphone');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      clearInterval(recordingTimerRef.current);
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      shouldSendRef.current = false;
+      audioChunksRef.current = [];
+      setIsRecording(false);
+      mediaRecorderRef.current.stop();
+      clearInterval(recordingTimerRef.current);
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+  };
+
+  const sendVoiceMessage = async (blob, duration) => {
+    setSending(true);
+    try {
+      const formData = new FormData();
+      formData.append('audio', blob, 'voice.webm');
+
+      const uploadRes = await fetch('/api/chat/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed');
+
+      await sendMessage(uploadData.url, 'voice', duration);
+    } catch (err) {
+      console.error('Voice send error:', err);
+      toast.error(err.message || 'Failed to send voice message');
+    } finally {
+      setSending(false);
+    }
+  };
 
   const toggleUrgent = async () => {
     if (viewerRole !== 'doctor' || !selectedConversation) return;
@@ -498,13 +680,14 @@ export default function PortalChatWorkspace({ viewerRole }) {
   const isMessagingLocked = viewerRole === 'doctor' ? false : selectedConversation?.deletedByDoctor === true || selectedConversation?.latestAppointmentStatus !== 'confirmed';
 
   return (
-    <div style={{ width: '100%', height: '100%', minHeight: '100%', alignSelf: 'stretch' }}>
+    <div style={{ width: '100%', height: '100%', minHeight: 0, alignSelf: 'stretch', display: 'flex', flexDirection: 'column' }}>
       <style>{`
-        .chat-workspace { height:100%; min-height:0; width:100%; display:flex; }
-        .chat-shell { display:grid; grid-template-columns:minmax(380px,500px) minmax(0,1fr); min-height:100%; height:100%; width:100%; overflow:hidden; background:linear-gradient(180deg,rgba(7,10,16,0.98),rgba(5,8,13,0.99)); }
+        .chat-workspace { height:100%; min-height:0; width:100%; display:flex; flex:1; overflow:hidden; }
+        .chat-shell { display:flex; height:100%; min-height:0; width:100%; overflow:hidden; background:linear-gradient(180deg,rgba(7,10,16,0.98),rgba(5,8,13,0.99)); }
         .chat-scroll { scroll-behavior: smooth; }
         .chat-scroll::-webkit-scrollbar { width:8px; }
-        .chat-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:999px; }
+        .chat-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.2); border-radius:999px; }
+        .chat-scroll::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.3); }
         .chat-tab { flex:1; padding:18px 20px; border:none; background:transparent; color:rgba(255,255,255,0.72); font-size:16px; border-bottom:3px solid transparent; cursor:pointer; }
         .chat-tab.active { color:${ACCENT}; border-bottom-color:${ACCENT}; }
         .chat-row { transition:all 0.2s ease; }
@@ -517,14 +700,35 @@ export default function PortalChatWorkspace({ viewerRole }) {
         .action-btn:hover:not(:disabled) { background:rgba(255,255,255,0.08) !important; color:white !important; }
         .close-btn:hover { background:rgba(255,255,255,0.1) !important; transform:rotate(90deg); }
         .msg-optimistic { opacity:0.75; }
+        .mic-btn:hover:not(:disabled) { background: rgba(24, 182, 162, 0.15) !important; transform: scale(1.05); }
+        @keyframes pulse-red {
+          0% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.2); opacity: 0.7; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .pulse-dot { animation: pulse-red 1.5s infinite ease-in-out; }
         @media (max-width:1100px) { .chat-shell { grid-template-columns:1fr; } .chat-left { border-right:none !important; border-bottom:1px solid rgba(255,255,255,0.12); max-height:42vh; } }
       `}</style>
 
-      <div className="chat-workspace">
+      <div className="chat-workspace" style={{ flex: 1, minHeight: 0 }}>
         <div className="chat-shell">
 
           {/* ── LEFT SIDEBAR ─────────────────────────────────────────────── */}
-          <aside className="chat-left" style={{ background: 'linear-gradient(180deg,rgba(10,14,21,0.98),rgba(8,11,18,0.98))', borderRight: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column' }}>
+          <aside className="chat-left" style={{ 
+            background: 'linear-gradient(180deg,rgba(10,14,21,0.98),rgba(8,11,18,0.98))', 
+            borderRight: '1px solid rgba(255,255,255,0.08)', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            height: '100%', 
+            minHeight: 0, 
+            overflow: 'hidden',
+            width: isSidebarCollapsed ? 0 : 440,
+            opacity: isSidebarCollapsed ? 0 : 1,
+            maxWidth: isSidebarCollapsed ? 0 : 440,
+            minWidth: isSidebarCollapsed ? 0 : 440,
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            pointerEvents: isSidebarCollapsed ? 'none' : 'auto',
+          }}>
             <div style={{ padding: '28px 28px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -592,7 +796,57 @@ export default function PortalChatWorkspace({ viewerRole }) {
           </aside>
 
           {/* ── MAIN CHAT AREA ───────────────────────────────────────────── */}
-          <section style={{ background: 'linear-gradient(180deg,rgba(7,10,16,0.96),rgba(5,8,12,0.99))', display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative' }}>
+          <section
+            onMouseEnter={() => setIsSidebarCollapsed(true)}
+            style={{ 
+              background: 'linear-gradient(180deg,rgba(7,10,16,0.96),rgba(5,8,12,0.99))', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              minWidth: 0, 
+              position: 'relative', 
+              height: '100%', 
+              minHeight: 0, 
+              overflow: 'hidden',
+              flex: 1,
+            }}
+          >
+            {isSidebarCollapsed && (
+              <button
+                type="button"
+                onMouseEnter={(e) => {
+                  setIsSidebarCollapsed(false);
+                  e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+                  e.currentTarget.style.background = 'rgba(24, 182, 162, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                  e.currentTarget.style.background = 'rgba(24, 182, 162, 0.08)';
+                }}
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 48,
+                  height: 90,
+                  background: 'rgba(24, 182, 162, 0.08)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(24, 182, 162, 0.3)',
+                  borderLeft: 'none',
+                  borderRadius: '0 24px 24px 0',
+                  color: ACCENT,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  zIndex: 110,
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  boxShadow: '0 0 20px rgba(0,0,0,0.4)',
+                }}
+              >
+                <ChevronRight size={28} style={{ filter: 'drop-shadow(0 0 4px #18b6a2)' }} />
+              </button>
+            )}
             <div style={{ position: 'absolute', inset: '0 0 auto 0', height: 220, background: 'radial-gradient(circle at top left,rgba(24,182,162,0.12),transparent 42%),radial-gradient(circle at top right,rgba(59,130,246,0.08),transparent 36%)', pointerEvents: 'none' }} />
 
             {selectedConversation ? (
@@ -622,7 +876,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
                     {selectedConversation.latestAppointmentStatus === 'confirmed' && selectedConversation.latestRoomId ? (
                       <button 
                         type="button" 
-                        onClick={() => initiateCall({ id: selectedConversation.counterpart.id, name: selectedConversation.counterpart.name }, selectedConversation.latestRoomId)} 
+                        onClick={() => initiateCall({ id: selectedConversation.counterpart.id, name: selectedConversation.counterpart.name }, selectedConversation._id)} 
                         className="action-btn" 
                         disabled={callState !== 'idle'}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.88)', fontSize: 16, cursor: 'pointer' }}
@@ -652,7 +906,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
                 </header>
 
                 {/* Messages */}
-                <div className="chat-scroll" style={{ flex: 1, overflowY: 'auto', padding: '28px 28px 12px', background: 'radial-gradient(circle at top left,rgba(24,182,162,0.08),transparent 26%),radial-gradient(circle at bottom right,rgba(59,130,246,0.08),transparent 24%)' }}>
+                <div className="chat-scroll" style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '28px 28px 12px', background: 'radial-gradient(circle at top left,rgba(24,182,162,0.08),transparent 26%),radial-gradient(circle at bottom right,rgba(59,130,246,0.08),transparent 24%)' }}>
                   {conversationLoading ? (
                     <div style={{ color: 'rgba(255,255,255,0.6)' }}>Loading messages...</div>
                   ) : entries.length === 0 ? (
@@ -666,36 +920,81 @@ export default function PortalChatWorkspace({ viewerRole }) {
                       </div>
                     ) : (
                       <div key={entry.id} style={{ marginBottom: 18 }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, justifyContent: entry.message.mine ? 'flex-end' : 'flex-start' }}>
-                          {!entry.message.mine && (
-                            <div style={{ width: 54, height: 54, borderRadius: '50%', background: otherTone.bg, color: otherTone.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800 }}>
-                              {initials(selectedConversation.counterpart.name)}
-                            </div>
-                          )}
-                          <div style={{ maxWidth: '72%' }} className={entry.message._optimistic ? 'msg-optimistic' : ''}>
-                            {entry.message.kind === 'call' ? (
-                              <div style={{ padding: '12px 20px', borderRadius: 22, background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.7)', fontSize: 16, border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', gap: 12, fontStyle: 'italic' }}>
-                                <Phone size={18} style={{ color: ACCENT }} />
-                                {entry.message.text}
-                              </div>
-                            ) : (
-                              <div style={{ padding: '18px 22px', borderRadius: 22, background: entry.message.mine ? ACCENT : 'rgba(255,255,255,0.06)', color: 'white', fontSize: 18, lineHeight: 1.6, border: `1px solid ${entry.message.mine ? ACCENT : 'rgba(255,255,255,0.08)'}`, boxShadow: entry.message.mine ? '0 16px 36px rgba(24,182,162,0.16)' : 'none' }}>
-                                {entry.message.text}
-                              </div>
-                            )}
-                            <div style={{ marginTop: 8, display: 'flex', justifyContent: entry.message.mine ? 'flex-end' : 'flex-start', gap: 6, color: 'rgba(255,255,255,0.56)', fontSize: 14 }}>
-                              <span>{messageTime(entry.message.createdAt)}</span>
-                              {entry.message.mine && (
-                                <span>· {entry.message._optimistic ? 'Sending…' : entry.message.readAt ? 'Read' : 'Delivered'}</span>
+                          <div style={{ display: 'flex', justifyContent: entry.message.mine ? 'flex-end' : 'flex-start' }}>
+                            <div style={{ maxWidth: '72%' }} className={entry.message._optimistic ? 'msg-optimistic' : ''}>
+                              {entry.message.kind === 'call' ? (
+                                <div style={{ 
+                                  padding: '12px 20px', 
+                                  borderRadius: 22, 
+                                  background: entry.message.mine 
+                                    ? 'linear-gradient(135deg, #18b6a2 0%, #20d4be 45%, #18b6a2 100%)' 
+                                    : 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.18) 45%, rgba(255,255,255,0.1) 100%)', 
+                                  color: 'white', 
+                                  fontSize: 16, 
+                                  fontStyle: 'italic',
+                                  border: `1px solid ${entry.message.mine ? '#18b6a2' : 'rgba(255,255,255,0.12)'}`, 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: 12,
+                                  boxShadow: entry.message.mine ? '0 12px 32px rgba(24,182,162,0.22)' : '0 8px 32px rgba(0,0,0,0.15)',
+                                  backdropFilter: entry.message.mine ? 'none' : 'blur(8px)'
+                                }}>
+                                  {(() => {
+                                    const text = entry.message.text.toLowerCase();
+                                    const isCancelled = (text.includes('no answer') || text.includes('not answered')) && !text.includes('missed');
+                                    const isMissed = text.includes('missed') || text.includes('declined') || text.includes('rejected');
+                                    
+                                    let Icon = entry.message.mine ? PhoneOutgoing : PhoneIncoming;
+                                    let color = 'white'; 
+                                    if (isMissed) color = '#fb7185';
+                                    return <Icon size={18} style={{ color }} />;
+                                  })()}
+                                  {entry.message.text}
+                                </div>
+                              ) : entry.message.kind === 'voice' ? (
+                                <div style={{ 
+                                  padding: '12px 20px', 
+                                  borderRadius: 22, 
+                                  background: entry.message.mine 
+                                    ? 'linear-gradient(135deg, #18b6a2 0%, #20d4be 45%, #18b6a2 100%)' 
+                                    : 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.18) 45%, rgba(255,255,255,0.1) 100%)', 
+                                  color: 'white', 
+                                  border: `1px solid ${entry.message.mine ? '#18b6a2' : 'rgba(255,255,255,0.12)'}`, 
+                                  boxShadow: entry.message.mine ? '0 12px 32px rgba(24,182,162,0.22)' : '0 8px 32px rgba(0,0,0,0.15)',
+                                  backdropFilter: entry.message.mine ? 'none' : 'blur(8px)',
+                                  minWidth: 260
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, opacity: 0.85 }}>
+                                    <span style={{ fontSize: 13, fontWeight: 700 }}>Voice Note</span>
+                                    <span style={{ fontSize: 13, fontWeight: 700 }}>{Math.floor((entry.message.voiceDuration || 0) / 60)}:{String((entry.message.voiceDuration || 0) % 60).padStart(2, '0')}</span>
+                                  </div>
+                                  <AudioPlayer src={entry.message.text} mine={entry.message.mine} />
+                                </div>
+                              ) : (
+                                <div style={{ 
+                                  padding: '18px 22px', 
+                                  borderRadius: 22, 
+                                  background: entry.message.mine 
+                                    ? 'linear-gradient(135deg, #18b6a2 0%, #20d4be 45%, #18b6a2 100%)' 
+                                    : 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.18) 45%, rgba(255,255,255,0.1) 100%)', 
+                                  color: 'white', 
+                                  fontSize: 18, 
+                                  lineHeight: 1.6, 
+                                  border: `1px solid ${entry.message.mine ? '#18b6a2' : 'rgba(255,255,255,0.12)'}`, 
+                                  boxShadow: entry.message.mine ? '0 12px 32px rgba(24,182,162,0.22)' : '0 8px 32px rgba(0,0,0,0.15)',
+                                  backdropFilter: entry.message.mine ? 'none' : 'blur(8px)'
+                                }}>
+                                  {entry.message.text}
+                                </div>
                               )}
+                              <div style={{ marginTop: 8, display: 'flex', justifyContent: entry.message.mine ? 'flex-end' : 'flex-start', gap: 6, color: 'rgba(255,255,255,0.56)', fontSize: 14 }}>
+                                <span>{messageTime(entry.message.createdAt)}</span>
+                                {entry.message.mine && (
+                                  <span>· {entry.message._optimistic ? 'Sending…' : entry.message.readAt ? 'Read' : 'Delivered'}</span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          {entry.message.mine && (
-                            <div style={{ width: 54, height: 54, borderRadius: '50%', background: ACCENT, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800 }}>
-                              {initials(user?.name || 'S')}
-                            </div>
-                          )}
-                        </div>
                       </div>
                     )
                   )}
@@ -737,24 +1036,91 @@ export default function PortalChatWorkspace({ viewerRole }) {
                     </div>
                   )}
 
-                  <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <button type="button" style={{ width: 68, height: 64, borderRadius: 18, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.56)' }}>
-                      <Paperclip size={24} style={{ margin: '0 auto' }} />
-                    </button>
-                    <input
-                      value={message}
-                      onChange={onChangeMessage}
-                      disabled={isMessagingLocked}
-                      placeholder={selectedConversation?.deletedByDoctor ? 'Book a new appointment to start chatting again…' : isMessagingLocked ? 'Available once appointment is confirmed…' : `Type a message to ${selectedConversation.counterpart.name.split(' ')[0]}...`}
-                      style={{ flex: 1, height: 64, borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.02)', color: 'white', fontSize: 18, padding: '0 24px', outline: 'none', opacity: isMessagingLocked ? 0.45 : 1, cursor: isMessagingLocked ? 'not-allowed' : 'text' }}
-                    />
-                    <button
-                      type="submit"
-                      disabled={sending || !message.trim() || isMessagingLocked}
-                      style={{ width: 64, height: 64, borderRadius: '50%', border: 'none', background: ACCENT, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isMessagingLocked ? 'not-allowed' : 'pointer', opacity: isMessagingLocked ? 0.4 : 1 }}
-                    >
-                      <Send size={24} />
-                    </button>
+                  <form 
+                    onSubmit={(e) => { e.preventDefault(); sendMessage(); }} 
+                    style={{ display: 'flex', alignItems: 'center', gap: 16, position: 'relative' }}
+                  >
+                    {!isRecording ? (
+                      <>
+                        <button type="button" className="action-btn" style={{ width: 68, height: 64, borderRadius: 18, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.56)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Paperclip size={24} />
+                        </button>
+                        <input
+                          value={message}
+                          onChange={onChangeMessage}
+                          disabled={isMessagingLocked}
+                          placeholder={selectedConversation?.deletedByDoctor ? 'Book a new appointment to start chatting again…' : isMessagingLocked ? 'Available once appointment is confirmed…' : `Type a message to ${selectedConversation.counterpart.name.split(' ')[0]}...`}
+                          style={{ flex: 1, height: 64, borderRadius: 20, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.02)', color: 'white', fontSize: 18, padding: '0 24px', outline: 'none', opacity: isMessagingLocked ? 0.45 : 1, cursor: isMessagingLocked ? 'not-allowed' : 'text' }}
+                        />
+                        <div style={{ display: 'flex', gap: 12 }}>
+                          <button
+                            type="button"
+                            onClick={startRecording}
+                            disabled={isMessagingLocked || sending}
+                            className="mic-btn action-btn"
+                            style={{ width: 64, height: 64, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s' }}
+                          >
+                            <Mic size={24} />
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={sending || !message.trim() || isMessagingLocked}
+                            style={{ width: 64, height: 64, borderRadius: '50%', border: 'none', background: ACCENT, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isMessagingLocked ? 'not-allowed' : 'pointer', opacity: isMessagingLocked ? 0.4 : 1 }}
+                          >
+                            <Send size={24} />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ flex: 1, height: 64, borderRadius: 24, background: 'rgba(24, 182, 162, 0.12)', border: '1px solid rgba(24, 182, 162, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <div className="pulse-dot" style={{ width: 12, height: 12, borderRadius: '50%', background: '#ef4444' }} />
+                          <span style={{ color: 'white', fontSize: 17, fontWeight: 600, minWidth: 40 }}>
+                            {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
+                          </span>
+                          <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />
+                          <Waveform levels={visualizerData} />
+                        </div>
+                        <div style={{ display: 'flex', gap: 14 }}>
+                          <button 
+                            type="button" 
+                            onClick={cancelRecording} 
+                            title="Discard Recording"
+                            className="action-btn"
+                            style={{ 
+                              width: 48, height: 48, borderRadius: '50%', 
+                              background: 'transparent', border: '1px solid rgba(239,68,68,0.2)', 
+                              color: 'rgba(239,68,68,0.85)', display: 'flex', alignItems: 'center', 
+                              justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)'; }}
+                          >
+                            <Trash2 size={20} />
+                          </button>
+                          <button 
+                            type="button" 
+                            onClick={stopRecording} 
+                            style={{ 
+                              padding: '0 24px', 
+                              height: 48,
+                              borderRadius: 16, 
+                              background: ACCENT, 
+                              border: 'none', 
+                              color: 'white', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: 10,
+                              cursor: 'pointer',
+                              fontWeight: 700,
+                              boxShadow: '0 8px 16px rgba(24,182,162,0.2)'
+                            }}
+                          >
+                            <Send size={18} /> Send
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </form>
                 </div>
               </>

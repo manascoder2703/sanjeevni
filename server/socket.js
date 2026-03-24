@@ -67,21 +67,27 @@ function clearManagedTimer(map, key) {
   }
 }
 
-function addOnlineUser(userId, socketId) {
+async function addOnlineUser(userId, socketId) {
   const normalizedUserId = String(userId || '');
   if (!normalizedUserId) return;
 
   if (!onlineUsers.has(normalizedUserId)) {
     onlineUsers.set(normalizedUserId, new Set());
+    
+    // Check if user is a doctor and get their manual status
+    try {
+      const db = mongoose.connection.db;
+      const doc = await db.collection('doctors').findOne({ userId: new mongoose.Types.ObjectId(normalizedUserId) });
+      const isActuallyAvailable = doc ? (doc.isOnline === true) : true;
+      io.emit('presence:changed', { userId: normalizedUserId, isOnline: isActuallyAvailable });
+    } catch (err) {
+      console.error('❌ Presence broadcast error:', err);
+      io.emit('presence:changed', { userId: normalizedUserId, isOnline: true });
+    }
   }
 
   const sockets = onlineUsers.get(normalizedUserId);
-  const wasOffline = sockets.size === 0;
   sockets.add(socketId);
-
-  if (wasOffline) {
-    io.emit('presence:changed', { userId: normalizedUserId, isOnline: true });
-  }
 }
 
 function removeOnlineUser(userId, socketId) {
@@ -206,46 +212,98 @@ io.on('connection', (socket) => {
   console.log(`✅ Client connected: ${socket.id}`);
 
   // Join personal room for notifications
-  socket.on('identify', ({ userId }) => {
+  socket.on('identify', async ({ userId, manualOffline }) => {
     if (userId) {
       const normalizedUserId = String(userId);
       socket.identifiedUserId = normalizedUserId;
       socket.join(normalizedUserId);
-      addOnlineUser(normalizedUserId, socket.id);
+      await addOnlineUser(normalizedUserId, socket.id);
       console.log(`👤 User ${userId} joined their personal notification room`);
-    }
-  });
 
-  socket.on('presence:query', ({ userIds = [] }) => {
-    const presence = {};
-    userIds.forEach((userId) => {
-      const normalizedUserId = String(userId || '');
-      if (!normalizedUserId) return;
-      presence[normalizedUserId] = onlineUsers.has(normalizedUserId);
-    });
-    socket.emit('presence:snapshot', { presence });
-  });
+      // Special handling for doctors to sync manual status immediately
+      if (manualOffline !== undefined) {
+        socket.isDoctor = true;
+        socket.userId = normalizedUserId;
+        
+        if (!onlineDoctors.has(normalizedUserId)) {
+          onlineDoctors.set(normalizedUserId, new Set());
+        }
+        onlineDoctors.get(normalizedUserId).add(socket.id);
 
-  // Doctor identifies themselves on dashboard entry
-  socket.on('doctor-online', async ({ userId }) => {
-    socket.isDoctor = true;
-    socket.userId = userId;
-
-    if (!onlineDoctors.has(userId)) {
-      onlineDoctors.set(userId, new Set());
-      try {
-        const db = mongoose.connection.db;
-        await db.collection('doctors').updateOne(
-          { userId: new mongoose.Types.ObjectId(userId) },
-          { $set: { isOnline: true } }
-        );
-        console.log(`📡 Doctor ${userId} is now ONLINE`);
-      } catch (err) {
-        console.error('❌ Error setting doctor online:', err);
+        try {
+          console.log(`👨‍⚕️ Doctor ${normalizedUserId} auto-sync: ${manualOffline ? 'BUSY' : 'AVAILABLE'}`);
+          await broadcastDoctorStatus(normalizedUserId, !manualOffline);
+        } catch (err) {
+          console.error('❌ Error in doctor identification sync:', err);
+        }
       }
     }
-    onlineDoctors.get(userId).add(socket.id);
   });
+
+  socket.on('presence:query', async ({ userIds = [] }) => {
+    const presence = {};
+    const normalizedIds = userIds.map(id => String(id || '')).filter(Boolean);
+    
+    try {
+      const db = mongoose.connection.db;
+      // Fetch all docs for these users in one go
+      const docs = await db.collection('doctors')
+        .find({ userId: { $in: normalizedIds.map(id => new mongoose.Types.ObjectId(id)) } })
+        .project({ userId: 1, isOnline: 1 })
+        .toArray();
+      
+      const manualOfflineMap = {};
+      docs.forEach(doc => {
+        manualOfflineMap[String(doc.userId)] = doc.isOnline === false;
+      });
+
+      normalizedIds.forEach((userId) => {
+        const isSystemOnline = onlineUsers.has(userId);
+        const isManuallyOffline = manualOfflineMap[userId] === true;
+        // Effective online = Connected AND not manually offline
+        presence[userId] = isSystemOnline && !isManuallyOffline;
+      });
+    } catch (err) {
+      console.error('❌ Presence Query Error:', err);
+      // Fallback to basic system presence
+      normalizedIds.forEach(id => { presence[id] = onlineUsers.has(id); });
+    }
+    
+    socket.emit('presence:snapshot', { presence });
+  });
+  // --- Unified Doctor Availability Helpers ---
+  const broadcastDoctorStatus = async (userId, isOnline) => {
+    try {
+      const db = mongoose.connection.db;
+      await db.collection('doctors').updateOne(
+        { userId: new mongoose.Types.ObjectId(userId) },
+        { $set: { isOnline } }
+      );
+      console.log(`📢 Status Broadcast: Doctor ${userId} -> ${isOnline ? 'AVAILABLE' : 'BUSY'}`);
+      io.emit('doctor:status-changed', { doctorId: userId, isOnline });
+    } catch (err) {
+      console.error('❌ Status Broadcast Failed:', err);
+      // Fallback broadcast even if DB fails to ensure UI reactiveity
+      io.emit('doctor:status-changed', { doctorId: userId, isOnline });
+    }
+  };
+
+  // Doctor identifies themselves on dashboard entry
+  socket.on('doctor-online', ({ userId }) => {
+    socket.isDoctor = true;
+    socket.userId = userId;
+    if (!onlineDoctors.has(userId)) onlineDoctors.set(userId, new Set());
+    onlineDoctors.get(userId).add(socket.id);
+    broadcastDoctorStatus(userId, true);
+  });
+
+  socket.on('doctor-offline', ({ userId }) => {
+    socket.isDoctor = true;
+    socket.userId = userId;
+    onlineDoctors.delete(userId); 
+    broadcastDoctorStatus(userId, false);
+  });
+
 
   socket.on('join-room', ({ roomId, userId, userName }) => {
     socket.join(roomId);
@@ -400,14 +458,10 @@ io.on('connection', (socket) => {
         if (onlineDoctors.get(doctorId).size === 0) {
           onlineDoctors.delete(doctorId);
           try {
-            const db = mongoose.connection.db;
-            await db.collection('doctors').updateOne(
-              { userId: new mongoose.Types.ObjectId(doctorId) },
-              { $set: { isOnline: false } }
-            );
-            console.log(`💤 Doctor ${doctorId} is now OFFLINE`);
+            console.log(`💤 Doctor ${doctorId} natural disconnect -> OFFLINE`);
+            await broadcastDoctorStatus(doctorId, false);
           } catch (err) {
-            console.error('❌ Error setting doctor offline:', err);
+            console.error('❌ Error in doctor disconnect sync:', err);
           }
         }
       }
@@ -505,11 +559,19 @@ app.post('/internal/lock-timer', (req, res) => {
   if (delay > 0) {
     console.log(`⏳ Setting server-side timer for user ${userId} (${delay/1000}s)`);
     const timerId = setTimeout(() => {
+      // 1. Notify the user who owned the lock
       io.to(userId).emit('lock-expired', { doctorId, date, timeSlot });
+      
+      // 2. Globally broadcast that the slot is now vacated
+      io.emit('slot:vacated', { doctorId, date, timeSlot });
+      
       clearManagedTimer(lockTimers, timerKey);
-      console.log(`⏰ Timer expired for user ${userId} (Slot: ${timeSlot})`);
+      console.log(`⏰ Timer expired and slot vacated globally (Doc: ${doctorId}, Slot: ${timeSlot})`);
     }, delay);
     lockTimers.set(timerKey, timerId);
+    
+    // Broadcast the initial lock globally
+    io.emit('slot:occupied', { doctorId, date, timeSlot, state: 'locked', patientId: userId });
   }
 
   res.json({ success: true });
@@ -522,6 +584,8 @@ app.post('/internal/cancel-lock-timer', (req, res) => {
     clearManagedTimer(lockTimers, timerKey);
     console.log(`🛑 Timer cancelled for user ${userId} (Slot: ${timeSlot})`);
   }
+  // Globally broadcast that the slot is now vacated
+  io.emit('slot:vacated', { doctorId, date, timeSlot });
   res.json({ success: true });
 });
 

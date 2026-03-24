@@ -23,6 +23,14 @@ const DoctorSchema = new mongoose.Schema(
     consultationType: { type: String, enum: ['Online', 'In-person', 'Both'], default: 'Both' },
     clinicAddress: { type: String, default: '' },
     isOnline: { type: Boolean, default: false },
+    busyRanges: [
+      {
+        date: { type: String, required: true }, // YYYY-MM-DD
+        startTime: { type: String, required: true }, // HH:mm AM/PM
+        endTime: { type: String, required: true },
+        slotKeys: [String] // Pre-calculated slot keys for 60-min forward blocks
+      }
+    ]
   },
   { timestamps: true }
 );

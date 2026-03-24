@@ -144,21 +144,25 @@ export default function DoctorPrescriptionsPage() {
           {patients.length === 0 ? (
             <div style={{ padding: 24, color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>No confirmed patients yet.</div>
           ) : patients.map(p => (
-            <button
+            <div
               key={p._id}
               onClick={() => selectPatient(p)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPatient(p); } }}
+              tabIndex={0}
+              role="button"
               style={{
                 width: '100%', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12,
                 background: selectedPatient?._id === p._id ? 'rgba(24,182,162,0.1)' : 'transparent',
                 border: 'none', borderBottom: '0.5px solid rgba(255,255,255,0.05)',
                 borderLeft: selectedPatient?._id === p._id ? `3px solid ${ACCENT}` : '3px solid transparent',
                 cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s',
+                boxSizing: 'border-box',
               }}
             >
               <div style={{ width: 36, height: 36, borderRadius: '50%', background: ACCENT, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>
                 {initials(p.name)}
               </div>
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>{p.name}</div>
                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
                   {p.age ? `${p.age} yrs · ` : ''}{p.gender || 'Unknown'}
@@ -190,7 +194,7 @@ export default function DoctorPrescriptionsPage() {
                   </button>
                 )}
               </div>
-            </button>
+            </div>
           ))}
         </div>
 

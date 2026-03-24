@@ -101,7 +101,7 @@ export async function POST(request) {
         return NextResponse.json({ error: 'This time slot was just booked by you.' }, { status: 409 });
       }
 
-      return NextResponse.json({ error: 'This time slot was just booked by someone else.' }, { status: 409 });
+      return NextResponse.json({ error: 'this slot was booked by someone else' }, { status: 409 });
     }
 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -144,7 +144,7 @@ export async function POST(request) {
           });
         }
 
-        return NextResponse.json({ error: 'Someone else is currently booking this slot. Try again in 10 minutes.' }, { status: 409 });
+        return NextResponse.json({ error: 'this slot is also locked to avoid conflict' }, { status: 409 });
       }
 
       throw err;

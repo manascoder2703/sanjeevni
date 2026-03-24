@@ -3,14 +3,20 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Star, Clock, Briefcase, Calendar, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Star, Clock, Briefcase, Calendar, CheckCircle, Phone, PhoneOff } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationContext';
+import { useCall } from '@/context/CallContext';
 import toast from 'react-hot-toast';
 import {
   buildTimeOptionsForWindow,
   DEFAULT_TIME_WINDOWS,
-  parseDateAndTimeSlot
+  parseDateAndTimeSlot,
+  formatMinutesToTimeLabel,
+  parseTimeLabelToMinutes,
+  getSlotKeysForTimeLabel,
+  slotKeyToTimeLabel,
+  formatMinutesToSlotKey
 } from '@/lib/bookingTime';
 
 const SLOT_META = {
@@ -18,6 +24,7 @@ const SLOT_META = {
   bookedByYou: { label: 'Booked by you', border: 'rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.08)', color: '#4ade80' },
   locked: { label: 'Held', border: 'rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.08)', color: '#fbbf24' },
   lockedByYou: { label: 'Held by you', border: 'rgba(59,130,246,0.35)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa' },
+  doctorBusy: { label: 'Doctor is Busy', border: 'rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)' },
   available: { label: 'Available', border: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.4)' }
 };
 
@@ -31,7 +38,8 @@ function getLocalDateValue(date = new Date()) {
 export default function DoctorProfilePage() {
   const { id } = useParams();
   const { user } = useAuth();
-  const { lastLockExpiry } = useNotifications();
+  const { lastLockExpiry, doctorPresence, socket } = useNotifications();
+  const { initiateCall, callState } = useCall();
   const router = useRouter();
 
   const [doctor, setDoctor] = useState(null);
@@ -44,7 +52,13 @@ export default function DoctorProfilePage() {
   const [timeLeft, setTimeLeft] = useState(null);
   const [slotStates, setSlotStates] = useState({});
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [localTime, setLocalTime] = useState('');
   const todayValue = useMemo(() => getLocalDateValue(), []);
+
+  // Effective online status derived from global presence map
+  const docUserId = doctor ? (typeof doctor.userId === 'object' ? doctor.userId._id : doctor.userId) : null;
+  const presenceStatus = doctorPresence[String(docUserId)];
+  const isOnline = presenceStatus !== undefined ? presenceStatus : doctor?.isOnline === true;
 
   const fetchDoctor = useCallback(async (dateValue = '') => {
     try {
@@ -103,6 +117,16 @@ export default function DoctorProfilePage() {
       fetchDoctor(selectedDate);
     }
   }, [lastLockExpiry, id, selectedDate, selectedSlot, fetchDoctor]);
+
+  // Sync localTime with selectedSlot only when selectedSlot changes externally
+  useEffect(() => {
+    if (selectedSlot) {
+      const hhmm = formatMinutesToSlotKey(parseTimeLabelToMinutes(selectedSlot));
+      setLocalTime(hhmm || '');
+    } else {
+      setLocalTime('');
+    }
+  }, [selectedSlot]);
 
   useEffect(() => {
     if (!lockExpiry) return;
@@ -179,26 +203,132 @@ export default function DoctorProfilePage() {
   }, [slotStates, visibleWindows]);
 
   useEffect(() => {
-    if (selectedWindow && !visibleWindows.includes(selectedWindow)) {
+    // Consolidated reset logic with stable dependency size
+    if (!selectedDate) return;
+
+    if (selectedWindow && visibleWindows.length > 0 && !visibleWindows.includes(selectedWindow)) {
       setSelectedWindow('');
       setSelectedSlot('');
       setLockExpiry(null);
       setTimeLeft(null);
     }
-  }, [selectedWindow, visibleWindows]);
+  }, [selectedDate, selectedWindow, visibleWindows.length]);
 
+  // Real-time slot synchronization
   useEffect(() => {
-    if (selectedSlot && !timeOptions.includes(selectedSlot)) {
-      setSelectedSlot('');
-      setLockExpiry(null);
-      setTimeLeft(null);
+    if (!socket || !id || !selectedDate) return;
+
+    const handleSlotOccupied = (data) => {
+      const { doctorId, date, timeSlot, state, patientId } = data;
+      if (doctorId === id && date === selectedDate) {
+        const keys = getSlotKeysForTimeLabel(timeSlot);
+        const finalState = patientId === user?.userId 
+          ? (state === 'locked' ? 'lockedByYou' : 'bookedByYou')
+          : (state === 'locked' ? 'locked' : 'booked');
+          
+        setSlotStates(prev => {
+          const next = { ...prev };
+          keys.forEach(k => {
+            const label = slotKeyToTimeLabel(k);
+            if (!next[label] || next[label] === 'available' || next[label] === undefined) {
+               next[label] = finalState;
+            }
+          });
+          return next;
+        });
+      }
+    };
+
+    const handleSlotVacated = (data) => {
+      const { doctorId, date, timeSlot } = data;
+      if (doctorId === id && date === selectedDate) {
+        const keys = getSlotKeysForTimeLabel(timeSlot);
+        setSlotStates(prev => {
+          const next = { ...prev };
+          keys.forEach(k => {
+            const label = slotKeyToTimeLabel(k);
+            delete next[label];
+          });
+          return next;
+        });
+        // Force refresh from server to ensure data consistency
+        fetchDoctor(selectedDate);
+      }
+    };
+
+    const handleBusyRangeAdded = (data) => {
+      const { doctorId, date, slotKeys } = data;
+      if (doctorId === String(docUserId) && date === selectedDate) {
+        setSlotStates(prev => {
+          const next = { ...prev };
+          slotKeys.forEach(k => { next[k] = 'doctorBusy'; });
+          return next;
+        });
+      }
+    };
+
+    const handleBusyRangeRemoved = (data) => {
+      const { doctorId, date, slotKeys } = data;
+      if (doctorId === String(docUserId) && date === selectedDate) {
+        setSlotStates(prev => {
+          const next = { ...prev };
+          slotKeys.forEach(k => { delete next[k]; });
+          return next;
+        });
+        fetchDoctor(selectedDate);
+      }
+    };
+
+    socket.on('slot:occupied', handleSlotOccupied);
+    socket.on('slot:vacated', handleSlotVacated);
+    socket.on('doctor:busy-range-added', handleBusyRangeAdded);
+    socket.on('doctor:busy-range-removed', handleBusyRangeRemoved);
+
+    return () => {
+      socket.off('slot:occupied', handleSlotOccupied);
+      socket.off('slot:vacated', handleSlotVacated);
+      socket.off('doctor:busy-range-added', handleBusyRangeAdded);
+      socket.off('doctor:busy-range-removed', handleBusyRangeRemoved);
+    };
+  }, [socket, id, selectedDate, user?.userId, fetchDoctor, docUserId]);
+
+  const getEffectiveSlotState = useCallback((timeLabel) => {
+    if (!timeLabel || !slotStates) return 'available';
+    const keys = getSlotKeysForTimeLabel(timeLabel); // 60 keys for 1-hour duration
+    
+    let hasBookedByYou = false;
+    let hasLockedByYou = false;
+    let hasBookedByOthers = false;
+    let hasLockedByOthers = false;
+    let hasDoctorBusy = false;
+
+    for (const k of keys) {
+      const state = slotStates[slotKeyToTimeLabel(k)];
+      if (state === 'bookedByYou') hasBookedByYou = true;
+      if (state === 'lockedByYou') hasLockedByYou = true;
+      if (state === 'booked') hasBookedByOthers = true;
+      if (state === 'locked') hasLockedByOthers = true;
+      if (state === 'doctorBusy') hasDoctorBusy = true;
     }
-  }, [selectedSlot, timeOptions]);
+
+    if (hasBookedByYou) return 'bookedByYou';
+    if (hasLockedByYou) return 'lockedByYou';
+    if (hasBookedByOthers) return 'booked';
+    if (hasLockedByOthers) return 'locked';
+    if (hasDoctorBusy) return 'doctorBusy';
+    
+    return 'available';
+  }, [slotStates]);
 
   const handleWindowClick = (windowStart) => {
     setSelectedWindow(windowStart);
-    if (!buildTimeOptionsForWindow(windowStart).includes(selectedSlot)) {
-      setSelectedSlot('');
+    // Only reset slot if it's outside the new window
+    const minutes = parseTimeLabelToMinutes(selectedSlot);
+    const windowMinutes = parseTimeLabelToMinutes(windowStart);
+    if (minutes !== null && windowMinutes !== null) {
+      if (minutes < windowMinutes || minutes >= windowMinutes + 60) {
+        setSelectedSlot('');
+      }
     }
     setLockExpiry(null);
     setTimeLeft(null);
@@ -238,7 +368,9 @@ export default function DoctorProfilePage() {
         body: JSON.stringify({ doctorId: id, date: selectedDate, timeSlot: selectedSlot })
       });
       const lockData = await lockRes.json();
-      if (!lockRes.ok) throw new Error(lockData.error);
+      if (!lockRes.ok) {
+        throw new Error(lockData.error || 'Failed to secure time slot');
+      }
       setLockExpiry(lockData.expiresAt);
 
       const res = await fetch('/api/appointments', {
@@ -259,6 +391,45 @@ export default function DoctorProfilePage() {
     }
   };
 
+  const initials = doctor?.userId?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'DR';
+  const selectedSlotState = getEffectiveSlotState(selectedSlot);
+  const isBookedByYou = selectedSlotState === 'bookedByYou';
+  const isLockedByYou = selectedSlotState === 'lockedByYou';
+  const isDoctorBusy = selectedSlotState === 'doctorBusy';
+  const isBlockedByOthers = selectedSlotState === 'booked' || selectedSlotState === 'locked' || isDoctorBusy;
+  const canSubmitBooking = selectedDate && selectedSlot && !booking && !isBookedByYou && !isDoctorBusy;
+
+  const format24To12 = (hhm) => {
+    if (!hhm) return '';
+    const [h, m] = hhm.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    let dispH = h % 12;
+    if (dispH === 0) dispH = 12;
+    return `${String(dispH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+  };
+
+  const getSlotMessage = () => {
+    if (isBookedByYou) return "This slot was booked by you";
+    if (isDoctorBusy) {
+      // Find which range specifically blocks this slot
+      const range = doctor?.busyRanges?.find(r => 
+        r.date === selectedDate && r.slotKeys.includes(selectedSlot)
+      );
+      if (range) return `Doctor is Busy from ${format24To12(range.startTime)} to ${format24To12(range.endTime)}`;
+      return "Doctor is Busy";
+    }
+    if (isBlockedByOthers) {
+      return "This time slot was booked by someone else";
+    }
+    return SLOT_META[selectedSlotState || 'available'].label;
+  };
+
+  const getEndTimeLabel = (timeLabel) => {
+    const minutes = parseTimeLabelToMinutes(timeLabel);
+    if (minutes === null) return '';
+    return formatMinutesToTimeLabel(minutes + 60);
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px' }}>
@@ -272,24 +443,39 @@ export default function DoctorProfilePage() {
     return <div style={{ textAlign: 'center', padding: '120px', color: 'rgba(255,255,255,0.3)' }}>Doctor not found</div>;
   }
 
-  const initials = doctor.userId?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'DR';
-  const selectedSlotState = selectedSlot ? slotStates[selectedSlot] : null;
-  const isBookedByYou = selectedSlotState === 'bookedByYou';
-  const isLockedByYou = selectedSlotState === 'lockedByYou';
-  const isBlockedByOthers = selectedSlotState === 'booked' || selectedSlotState === 'locked';
-  const canSubmitBooking = selectedDate && selectedSlot && !booking && !isBookedByYou && !isBlockedByOthers;
-
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', padding: '32px' }}>
       <div style={{ maxWidth: 940, margin: '0 auto' }}>
-        <Link
-          href="/dashboard/patient/doctors"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.3)', textDecoration: 'none', marginBottom: '32px', fontSize: '13px', fontWeight: '600', transition: 'color 0.2s' }}
-          onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-          onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
-        >
-          <ArrowLeft size={16} /> Back to Network
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+          <Link
+            href="/dashboard/patient/doctors"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'rgba(255,255,255,0.3)', textDecoration: 'none', fontSize: '13px', fontWeight: '600', transition: 'color 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+            onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+          >
+            <ArrowLeft size={16} /> Back to Network
+          </Link>
+
+          <button
+            onClick={() => doctor && initiateCall(doctor.userId?._id || doctor.userId, doctor._id)}
+            disabled={!isOnline || callState !== 'idle'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 24px', borderRadius: '14px',
+              background: isOnline ? '#fff' : 'rgba(255,255,255,0.03)',
+              color: isOnline ? '#000' : 'rgba(255,255,255,0.2)',
+              fontSize: '14px', fontWeight: '800', border: 'none',
+              cursor: (isOnline && callState === 'idle') ? 'pointer' : 'not-allowed',
+              transition: 'all 0.2s',
+              boxShadow: isOnline ? '0 4px 20px rgba(255,255,255,0.1)' : 'none'
+            }}
+          >
+            {isOnline ? (
+              <><Phone size={16} fill="currentColor" /> Call Now</>
+            ) : (
+              <><PhoneOff size={16} /> Doctor Busy</>
+            )}
+          </button>
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '32px', alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -299,7 +485,7 @@ export default function DoctorProfilePage() {
                   <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'linear-gradient(135deg, #3b82f6, #60a5fa)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: '800', color: '#fff', boxShadow: '0 0 30px rgba(59,130,246,0.3)' }}>
                     {initials}
                   </div>
-                  <div style={{ position: 'absolute', bottom: '4px', right: '4px', width: '14px', height: '14px', borderRadius: '50%', background: doctor.isOnline ? '#4ade80' : 'rgba(255,255,255,0.2)', border: '3px solid #050608' }} />
+                  <div style={{ position: 'absolute', bottom: '4px', right: '4px', width: '14px', height: '14px', borderRadius: '50%', background: isOnline ? '#4ade80' : 'rgba(255,255,255,0.2)', border: '3px solid #050608' }} />
                 </div>
 
                 <div style={{ flex: 1 }}>
@@ -448,55 +634,76 @@ export default function DoctorProfilePage() {
                         <label style={{ fontSize: '11px', fontWeight: '800', color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.08em', paddingLeft: '4px' }}>
                           Select Exact Start Time
                         </label>
-                        <select
-                          value={selectedSlot}
-                          onChange={(e) => {
-                            setSelectedSlot(e.target.value);
-                            setLockExpiry(null);
-                            setTimeLeft(null);
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '14px 16px',
-                            borderRadius: '14px',
-                            background: 'rgba(255,255,255,0.035)',
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            color: '#fff',
-                            fontSize: '14px',
-                            outline: 'none',
-                            colorScheme: 'dark',
-                            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)'
-                          }}
-                        >
-                          <option value="" style={{ backgroundColor: '#0a0f1a', color: 'rgba(255,255,255,0.75)' }}>Choose a time</option>
-                          {timeOptions.map((slot) => {
-                            const slotState = slotStates[slot] || 'available';
-                            const meta = SLOT_META[slotState];
-                            const isDisabled = slotState === 'booked' || slotState === 'locked' || slotState === 'bookedByYou';
-                            const optionLabel = slotState === 'available' ? slot : `${slot} - ${meta.label}`;
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type="time"
+                            value={localTime}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (!val) {
+                                setLocalTime('');
+                                setSelectedSlot('');
+                                return;
+                              }
+                              
+                              const minutes = parseTimeLabelToMinutes(val);
+                              const windowMins = selectedWindow ? parseTimeLabelToMinutes(selectedWindow) : null;
+                              
+                              // Enforcement: Stay within the selected 1-hour window
+                              if (windowMins !== null && minutes !== null) {
+                                if (minutes < windowMins || minutes >= windowMins + 60) {
+                                  toast.error(`Please select a time within the ${selectedWindow} window`);
+                                  return;
+                                }
+                              }
 
-                            return (
-                              <option
-                                key={slot}
-                                value={slot}
-                                disabled={isDisabled}
-                                style={{
-                                  backgroundColor: '#0a0f1a',
-                                  color: isDisabled ? '#94a3b8' : '#f8fafc'
-                                }}
-                              >
-                                {optionLabel}
-                              </option>
-                            );
-                          })}
-                        </select>
+                              setLocalTime(val); 
+                              if (minutes !== null) {
+                                setSelectedSlot(formatMinutesToTimeLabel(minutes));
+                              }
+                            }}
+                            min={selectedWindow ? formatMinutesToSlotKey(parseTimeLabelToMinutes(selectedWindow)) : undefined}
+                            max={selectedWindow ? formatMinutesToSlotKey(parseTimeLabelToMinutes(selectedWindow) + 59) : undefined}
+                            style={{
+                              width: '100%',
+                              padding: '14px 16px',
+                              borderRadius: '14px',
+                              background: 'rgba(255,255,255,0.035)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              color: '#fff',
+                              fontSize: '14px',
+                              outline: 'none',
+                              colorScheme: 'dark',
+                              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)'
+                            }}
+                          />
+                        </div>
 
                         {selectedSlot && (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                            <span style={{ fontSize: '12px', fontWeight: '700', color: '#fff' }}>{selectedSlot}</span>
-                            <span style={{ fontSize: '11px', fontWeight: '700', letterSpacing: '0.05em', textTransform: 'uppercase', color: SLOT_META[selectedSlotState || 'available'].color }}>
-                              {SLOT_META[selectedSlotState || 'available'].label}
-                            </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              justifyContent: isDoctorBusy ? 'center' : 'space-between', 
+                              padding: '10px 12px', 
+                              borderRadius: '12px', 
+                              background: 'rgba(255,255,255,0.03)', 
+                              border: '1px solid rgba(255,255,255,0.06)' 
+                            }}>
+                              {!isDoctorBusy && (
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#fff' }}>{selectedSlot} — {getEndTimeLabel(selectedSlot)}</span>
+                                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', fontWeight: '600' }}>60 min consultation</span>
+                                </div>
+                              )}
+                              <span style={{ 
+                                fontSize: '11px', fontWeight: '800', letterSpacing: '0.05em', 
+                                textTransform: 'uppercase', color: SLOT_META[selectedSlotState || 'available'].color,
+                                textAlign: isDoctorBusy ? 'center' : 'right'
+                              }}>
+                                {getSlotMessage()}
+                              </span>
+                            </div>
                           </div>
                         )}
                       </div>

@@ -22,7 +22,7 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { text = '', kind = 'text', callDuration = 0, callStatus = 'completed' } = await request.json();
+    const { text = '', kind = 'text', voiceDuration = 0, callDuration = 0, callStatus = 'completed' } = await request.json();
     const trimmedText = text.trim();
 
     if (!trimmedText) {
@@ -72,6 +72,7 @@ export async function POST(request, { params }) {
           senderRole: user.role,
           text: trimmedText,
           kind,
+          voiceDuration,
           createdAt,
           deliveredAt: createdAt,
           readAt: null,
@@ -95,6 +96,7 @@ export async function POST(request, { params }) {
         senderRole: user.role,
         text: trimmedText,
         kind,
+        voiceDuration,
         createdAt,
         deliveredAt: createdAt,
         readAt: null,
@@ -109,6 +111,7 @@ export async function POST(request, { params }) {
         senderRole: user.role,
         text: trimmedText,
         kind,
+        voiceDuration,
         createdAt,
         deliveredAt: createdAt,
         readAt: null,

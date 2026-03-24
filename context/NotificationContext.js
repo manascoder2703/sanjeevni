@@ -12,37 +12,47 @@ export function NotificationProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [socket, setSocket] = useState(null);
   const [lastLockExpiry, setLastLockExpiry] = useState(null);
-  const normalizedUserId = user?.userId || user?.id || user?._id;
+  const [doctorPresence, setDoctorPresence] = useState({});
+  const NORMALIZED_USER_ID = user?.id || user?._id || user?.userId;
 
   // Load from local storage on mount
   useEffect(() => {
-    const saved = localStorage.getItem(`notifications_${normalizedUserId}`);
+    const saved = localStorage.getItem(`notifications_${NORMALIZED_USER_ID}`);
     if (saved) {
       const parsed = JSON.parse(saved);
       setNotifications(parsed);
       setUnreadCount(parsed.filter(n => !n.read).length);
     }
-  }, [normalizedUserId]);
+  }, [NORMALIZED_USER_ID]);
 
   // Sync with local storage
   useEffect(() => {
-    if (normalizedUserId) {
-      localStorage.setItem(`notifications_${normalizedUserId}`, JSON.stringify(notifications));
+    if (NORMALIZED_USER_ID) {
+      localStorage.setItem(`notifications_${NORMALIZED_USER_ID}`, JSON.stringify(notifications));
       setUnreadCount(notifications.filter(n => !n.read).length);
     }
-  }, [notifications, normalizedUserId]);
+  }, [notifications, NORMALIZED_USER_ID]);
 
   useEffect(() => {
-    if (!normalizedUserId) return;
+    if (!NORMALIZED_USER_ID) return;
 
-    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001');
+    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
+      reconnection: true,
+      transports: ['websocket', 'polling']
+    });
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      newSocket.emit('identify', { userId: normalizedUserId });
-      if (user?.role === 'doctor') {
-        newSocket.emit('doctor-online', { userId: normalizedUserId });
-      }
+      console.log('✅ Signaling Socket Connected:', newSocket.id);
+      
+      const isManualOff = user?.role === 'doctor' 
+        ? localStorage.getItem(`doctor_manual_offline_${NORMALIZED_USER_ID}`) === 'true'
+        : undefined;
+
+      newSocket.emit('identify', { 
+        userId: NORMALIZED_USER_ID,
+        manualOffline: isManualOff 
+      });
     });
 
     newSocket.on('new-notification', (notification) => {
@@ -56,13 +66,18 @@ export function NotificationProvider({ children }) {
       setLastRatingUpdate(data);
     });
 
+    newSocket.on('doctor:status-changed', (data) => {
+      const { doctorId, isOnline } = data;
+      setDoctorPresence(prev => ({ ...prev, [doctorId]: isOnline }));
+    });
+
     newSocket.on('lock-expired', (data) => {
       console.log('🔄 Lock expired (Socket):', data);
       setLastLockExpiry(data);
     });
 
     return () => newSocket.disconnect();
-  }, [normalizedUserId]);
+  }, [NORMALIZED_USER_ID]);
 
   const [lastRatingUpdate, setLastRatingUpdate] = useState(null);
 
@@ -89,6 +104,7 @@ export function NotificationProvider({ children }) {
       clearNotifications,
       lastRatingUpdate,
       lastLockExpiry,
+      doctorPresence,
       socket
     }}>
       {children}

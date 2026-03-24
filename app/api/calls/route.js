@@ -15,8 +15,8 @@ export async function GET(request) {
     }
 
     const query = user.role === 'doctor' 
-      ? { doctorUserId: user.userId } 
-      : { patientUserId: user.userId };
+      ? { doctorUserId: user.userId, deletedByDoctor: { $ne: true } } 
+      : { patientUserId: user.userId, deletedByPatient: { $ne: true } };
 
     const logs = await CallLog.find(query)
       .sort({ createdAt: -1 })
@@ -57,5 +57,32 @@ export async function GET(request) {
   } catch (error) {
     console.error('Call logs FETCH error:', error);
     return NextResponse.json({ error: 'Failed to fetch call logs' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request) {
+  try {
+    await connectDB();
+    const user = await getUserFromRequest(request);
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { ids, all } = await request.json();
+    const deleteField = user.role === 'doctor' ? 'deletedByDoctor' : 'deletedByPatient';
+    const query = user.role === 'doctor' 
+      ? { doctorUserId: user.userId } 
+      : { patientUserId: user.userId };
+
+    if (all) {
+      await CallLog.updateMany(query, { $set: { [deleteField]: true } });
+    } else if (Array.isArray(ids) && ids.length > 0) {
+      await CallLog.updateMany({ ...query, _id: { $in: ids } }, { $set: { [deleteField]: true } });
+    } else {
+      return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Call logs DELETE error:', error);
+    return NextResponse.json({ error: 'Failed to delete call logs' }, { status: 500 });
   }
 }

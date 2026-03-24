@@ -19,8 +19,12 @@ const ConversationMessageSchema = new mongoose.Schema(
     },
     kind: {
       type: String,
-      enum: ['text', 'quick-action', 'call'],
+      enum: ['text', 'quick-action', 'call', 'voice'],
       default: 'text',
+    },
+    voiceDuration: {
+      type: Number,
+      default: 0,
     },
     deliveredAt: {
       type: Date,
@@ -125,4 +129,10 @@ ConversationSchema.index({ doctorUserId: 1, patientUserId: 1 }, { unique: true }
 ConversationSchema.index({ doctorUserId: 1, lastMessageAt: -1, updatedAt: -1 });
 ConversationSchema.index({ patientUserId: 1, lastMessageAt: -1, updatedAt: -1 });
 
-export default mongoose.models.Conversation || mongoose.model('Conversation', ConversationSchema);
+// In Next.js dev mode, the model might be already registered.
+// We clear it to ensure the newest schema (with voiceDuration) is used.
+if (mongoose.models.Conversation) {
+  delete mongoose.models.Conversation;
+}
+
+export default mongoose.model('Conversation', ConversationSchema);
