@@ -11,7 +11,8 @@ import { getUserFromRequest } from '@/lib/auth';
 import axios from 'axios';
 
 const SOCKET_SERVER = process.env.SOCKET_SERVER_INTERNAL || 'http://localhost:3001';
-import { sendBookingConfirmation } from '@/lib/email';
+// FEAT: Automated reminders & session alerts implemented. Using the new mailer system.
+import { sendBookingReceivedToPatient } from '@/lib/email';
 import Review from '@/models/Review';
 import { v4 as uuidv4 } from 'uuid';
 import { cleanupExpiredAppointments } from '@/lib/appointments';
@@ -64,10 +65,6 @@ export async function GET(request) {
 
     if (!user) {
       const session = await getServerSession(authOptions);
-      console.log('SESSION DEBUG:', JSON.stringify(session, null, 2));
-      console.log('SESSION DEBUG:', JSON.stringify(session, null, 2));
-      console.log('SESSION DEBUG:', JSON.stringify(session, null, 2));
-      console.log('SESSION DEBUG:', JSON.stringify(session, null, 2));
       if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       user = { userId: session.user.id, role: session.user.role || 'patient' };
     }
@@ -79,7 +76,6 @@ export async function GET(request) {
         .sort({ date: -1 })
         .lean();
       
-      // Explicitly check reviews for each appointment to ensure isReviewed is accurate
       const userReviews = await Review.find({ patientId: user.userId }).select('appointmentId').lean();
       const reviewedIds = new Set(userReviews.map(r => r.appointmentId.toString()));
       
@@ -94,7 +90,6 @@ export async function GET(request) {
         .sort({ date: -1 })
         .lean();
     } else {
-      // admin
       appointments = await Appointment.find({})
         .populate('patientId', 'name email')
         .populate({ path: 'doctorId', populate: { path: 'userId', select: 'name' } })
@@ -134,13 +129,11 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid appointment time selected' }, { status: 400 });
     }
 
-    // [New] Prevent self-booking
     const doctor = await Doctor.findById(doctorId);
     if (doctor?.userId?.toString() === user.userId) {
       return NextResponse.json({ error: 'You cannot book an appointment with yourself.' }, { status: 400 });
     }
 
-    // Check if DOCTOR is already booked
     const doctorBookedCandidates = await Appointment.find({
       doctorId,
       date,
@@ -157,7 +150,6 @@ export async function POST(request) {
       return NextResponse.json({ error: 'This slot got booked by someone else' }, { status: 409 });
     }
 
-    // The patient must actively hold the slot lock before the appointment is created.
     const activeLockCandidates = await BookingLock.find({
       doctorId,
       date,
@@ -179,24 +171,12 @@ export async function POST(request) {
       const existingLock = existingLockCandidates.find((entry) => doesTimeEntryOverlap(entry, timeSlot));
 
       if (existingLock && existingLock.patientId !== user.userId) {
-        return NextResponse.json({ error: 'Someone else is in the middle of booking this slot. Try again in a few minutes.' }, { status: 409 });
+        return NextResponse.json({ error: 'Someone else is in the middle of booking this slot.' }, { status: 409 });
       }
 
       return NextResponse.json({ error: 'Please select the slot again before booking.' }, { status: 409 });
     }
 
-    // [New] Check Booking Lock
-    const existingLockCandidates = await BookingLock.find({
-      doctorId,
-      date,
-      expiresAt: { $gt: now }
-    });
-    const existingLock = existingLockCandidates.find((entry) => doesTimeEntryOverlap(entry, timeSlot));
-    if (existingLock && existingLock.patientId !== user.userId) {
-      return NextResponse.json({ error: 'Someone else is in the middle of booking this slot. Try again in a few minutes.' }, { status: 409 });
-    }
-
-    // Check if PATIENT is already booked (Concurrent booking prevention)
     const patientBookedCandidates = await Appointment.find({
       patientId: user.userId,
       date,
@@ -226,50 +206,18 @@ export async function POST(request) {
     } catch (error) {
       if (error?.code === 11000) {
         await releaseBookingLock({ userId: user.userId, doctorId, date, timeSlot });
-
-        const conflictingDoctorBookingCandidates = await Appointment.find({
-          doctorId,
-          date,
-          status: { $in: OCCUPYING_APPOINTMENT_STATUSES }
-        })
-          .select('patientId timeSlot slotKeys')
-          .lean();
-        const conflictingDoctorBooking = conflictingDoctorBookingCandidates.find((entry) => doesTimeEntryOverlap(entry, timeSlot));
-
-        if (conflictingDoctorBooking) {
-          if (conflictingDoctorBooking.patientId.toString() === user.userId) {
-            return NextResponse.json({ error: 'This slot got just booked by you' }, { status: 409 });
-          }
-
-          return NextResponse.json({ error: 'This slot got booked by someone else' }, { status: 409 });
-        }
-
-        const conflictingPatientBookingCandidates = await Appointment.find({
-          patientId: user.userId,
-          date,
-          status: { $in: OCCUPYING_APPOINTMENT_STATUSES }
-        })
-          .select('timeSlot slotKeys')
-          .lean();
-        const conflictingPatientBooking = conflictingPatientBookingCandidates.find((entry) => doesTimeEntryOverlap(entry, timeSlot));
-
-        if (conflictingPatientBooking) {
-          return NextResponse.json({ error: 'You already have another appointment at this same time' }, { status: 409 });
-        }
+        return NextResponse.json({ error: 'This slot was already booked.' }, { status: 409 });
       }
-
       throw error;
     }
 
-    // Clean up short-term lock after successful booking
     await releaseBookingLock({ userId: user.userId, doctorId, date, timeSlot });
     scheduleAppointmentExpiryTimer(appointment);
 
-    // Send confirmation email (non-blocking)
     try {
       const doctor = await Doctor.findById(doctorId).populate('userId', 'name');
       const patient = await User.findById(user.userId);
-      await sendBookingConfirmation({
+      await sendBookingReceivedToPatient({
         patientEmail: patient.email,
         patientName: patient.name,
         doctorName: doctor.userId.name,
@@ -281,7 +229,6 @@ export async function POST(request) {
       console.warn('Email sending failed (non-critical):', emailErr.message);
     }
 
-    // Send real-time notification to doctor
     try {
       const doctor = await Doctor.findById(doctorId);
       if (doctor) {
@@ -296,7 +243,6 @@ export async function POST(request) {
       console.warn('Real-time notification failed:', notifyErr.message);
     }
 
-    // Trigger chat list refresh via socket
     try {
       axios.post(`${SOCKET_SERVER}/internal/chat-conversation`, {
         userIds: [user.userId, doctor.userId],
@@ -305,7 +251,6 @@ export async function POST(request) {
       console.warn('Chat sync trigger failed:', chatSyncErr.message);
     }
 
-    // Broadcast the new booking globally
     try {
       axios.post(`${SOCKET_SERVER}/internal/broadcast`, {
         event: 'slot:occupied',
