@@ -67,6 +67,7 @@ export default function FindDoctors() {
   const [onlineOnly, setOnlineOnly]         = useState(false);
   const [showFilters, setShowFilters]       = useState(false);
   const [feeRange, setFeeRange]             = useState(5000);
+  const [experienceRange, setExperienceRange] = useState(0);
 
   const { lastRatingUpdate, doctorPresence } = useNotifications();
 
@@ -126,9 +127,10 @@ export default function FindDoctors() {
         bio.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesFee = (doc.fee || 0) <= feeRange;
+      const matchesExperience = (doc.experience || 0) >= experienceRange;
       const matchesOnline = !onlineOnly || doc.isOnline === true;
 
-      return matchesSearch && matchesFee && matchesOnline;
+      return matchesSearch && matchesFee && matchesExperience && matchesOnline;
     });
 
     const oCount = list.filter(d => d.isOnline).length;
@@ -137,20 +139,20 @@ export default function FindDoctors() {
       : '0.0';
 
     return { filteredDoctors: filtered, onlineCount: oCount, avgRating: aRating };
-  }, [doctors, doctorPresence, searchQuery, feeRange, onlineOnly]);
+  }, [doctors, doctorPresence, searchQuery, feeRange, experienceRange, onlineOnly]);
 
-  const hasActiveFilters = onlineOnly || feeRange < maxFee;
+  const hasActiveFilters = onlineOnly || feeRange < maxFee || experienceRange > 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%', paddingBottom: '80px' }}>
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 14px', borderRadius: '99px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgba(255,255,255,0.3)' }}>
-          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22d3ee', display: 'inline-block', boxShadow: '0 0 10px rgba(34,211,238,0.5)' }} />
           Medical Directory
         </span>
-        <h1 style={{ fontSize: '40px', fontWeight: '800', color: '#fff', letterSpacing: '-1px', margin: 0 }}>
-          Network <span style={{ color: '#3b82f6' }}>Diagnostics</span>
+        <h1 style={{ fontSize: '44px', fontWeight: '900', color: '#fff', letterSpacing: '-1.5px', margin: 0, textShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
+          Network <span className="gradient-text">Diagnostics</span>
         </h1>
         <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.18em', fontWeight: '600', margin: 0 }}>
           Access verified medical expertise
@@ -167,8 +169,8 @@ export default function FindDoctors() {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '14px 16px 14px 42px', fontSize: '14px', color: '#fff', outline: 'none', boxSizing: 'border-box' }}
-            onFocus={e => e.target.style.borderColor = 'rgba(59,130,246,0.4)'}
-            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
+            onFocus={e => { e.target.style.borderColor = 'rgba(255,255,255,0.4)'; e.target.style.boxShadow = '0 0 15px rgba(255,255,255,0.05)'; }}
+            onBlur={e => { e.target.style.borderColor = 'rgba(255,255,255,0.08)'; e.target.style.boxShadow = 'none'; }}
           />
           {searchQuery && (
             <button onClick={() => setSearchQuery('')}
@@ -178,28 +180,43 @@ export default function FindDoctors() {
           )}
         </div>
         <button onClick={() => setShowFilters(v => !v)}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderRadius: '14px', border: `1px solid ${hasActiveFilters ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)'}`, background: hasActiveFilters ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.03)', color: hasActiveFilters ? '#60a5fa' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderRadius: '14px', border: `1px solid ${hasActiveFilters ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.2)'}`, background: hasActiveFilters ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)', color: hasActiveFilters ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '800', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s', boxShadow: hasActiveFilters ? '0 0 20px rgba(255,255,255,0.05)' : 'none' }}>
           <SlidersHorizontal size={14} />
-          Filters {hasActiveFilters && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#3b82f6', display: 'inline-block' }} />}
+          Filters {hasActiveFilters && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22d3ee', display: 'inline-block', boxShadow: '0 0 10px rgba(34,211,238,0.6)' }} />}
         </button>
       </div>
 
       {/* Filter Panel */}
       {showFilters && (
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '20px', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '700px', margin: '0 auto', width: '100%' }}>
+        <div style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '20px', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '700px', margin: '0 auto', width: '100%' }}>
 
           {/* Fee Range */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Consultation Fee</span>
-              <span style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>Up to ₹{feeRange.toLocaleString()}</span>
+              <span style={{ fontSize: '11px', fontWeight: '800', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Consultation Fee</span>
+              <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>Up to ₹{feeRange.toLocaleString()}</span>
             </div>
             <input type="range" min={0} max={maxFee} step={100} value={feeRange}
               onChange={e => setFeeRange(Number(e.target.value))}
-              style={{ width: '100%', accentColor: '#3b82f6', cursor: 'pointer' }} />
+              style={{ width: '100%', accentColor: '#22d3ee', cursor: 'pointer' }} />
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)' }}>₹0</span>
-              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)' }}>₹{maxFee.toLocaleString()}</span>
+              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.15)' }}>₹0</span>
+              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.15)' }}>₹{maxFee.toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Experience Range */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', fontWeight: '800', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Minimum Experience</span>
+              <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>{experienceRange}+ Years</span>
+            </div>
+            <input type="range" min={0} max={40} step={1} value={experienceRange}
+              onChange={e => setExperienceRange(Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#22d3ee', cursor: 'pointer' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.15)' }}>Fresh Talent</span>
+              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.15)' }}>Expert (40y)</span>
             </div>
           </div>
 
@@ -210,14 +227,14 @@ export default function FindDoctors() {
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: '3px 0 0' }}>Show only doctors currently online</p>
             </div>
             <button onClick={() => setOnlineOnly(v => !v)}
-              style={{ width: '44px', height: '24px', borderRadius: '99px', background: onlineOnly ? '#3b82f6' : 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
-              <span style={{ position: 'absolute', top: '3px', left: onlineOnly ? '22px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+              style={{ width: '44px', height: '24px', borderRadius: '99px', background: onlineOnly ? '#22d3ee' : 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0, boxShadow: onlineOnly ? '0 0 15px rgba(34,211,238,0.4)' : 'none' }}>
+              <span style={{ position: 'absolute', top: '3px', left: onlineOnly ? '22px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
 
           {/* Reset */}
           {hasActiveFilters && (
-            <button onClick={() => { setFeeRange(maxFee); setOnlineOnly(false); }}
+            <button onClick={() => { setFeeRange(maxFee); setExperienceRange(0); setOnlineOnly(false); }}
               style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: '12px', fontWeight: '600', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
               Reset filters
             </button>
@@ -228,12 +245,13 @@ export default function FindDoctors() {
       {/* Stats */}
       {!loading && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', width: '100%' }}>
+          {/* Statistics */}
           {[
             { label: 'Specialists',   value: doctors.length },
             { label: 'Online Now',    value: onlineCount, highlight: onlineCount > 0 },
             { label: 'Avg Rating',    value: avgRating },
           ].map(stat => (
-            <div key={stat.label} style={{ background: 'rgba(255,255,255,0.02)', border: `0.5px solid ${stat.highlight ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+            <div key={stat.label} className="neon-glass-card obsidian-card" style={{ border: `1px solid ${stat.highlight ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.2)'}`, borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
               <div style={{ fontSize: '28px', fontWeight: '800', color: stat.highlight ? '#4ade80' : '#fff', letterSpacing: '-0.5px' }}>{stat.value}</div>
               <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: '600', marginTop: '4px' }}>{stat.label}</div>
             </div>
@@ -252,7 +270,7 @@ export default function FindDoctors() {
             const isActive = selectedSpecialty === spec;
             return (
               <button key={spec} onClick={() => setSelectedSpecialty(spec)}
-                style={{ padding: '7px 16px', borderRadius: '99px', fontSize: '12px', fontWeight: '500', border: `1px solid ${isActive ? '#3b82f6' : 'rgba(255,255,255,0.08)'}`, background: isActive ? '#3b82f6' : 'rgba(255,255,255,0.03)', color: isActive ? '#fff' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: 'all 0.15s' }}
+                style={{ padding: '7px 16px', borderRadius: '99px', fontSize: '12px', fontWeight: '800', border: `1px solid ${isActive ? '#22d3ee' : 'rgba(255,255,255,0.08)'}`, background: isActive ? 'rgba(34,211,238,0.1)' : 'rgba(255,255,255,0.03)', color: isActive ? '#fff' : 'rgba(255,255,255,0.4)', cursor: 'pointer', transition: 'all 0.15s', textTransform: 'uppercase', letterSpacing: '0.05em' }}
                 onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.color = '#fff'; }}}
                 onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; }}}
               >
@@ -283,7 +301,7 @@ export default function FindDoctors() {
               <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.25)', margin: 0 }}>Try adjusting your search or filters.</p>
             </div>
             {hasActiveFilters && (
-              <button onClick={() => { setFeeRange(maxFee); setOnlineOnly(false); setSearchQuery(''); }}
+              <button onClick={() => { setFeeRange(maxFee); setExperienceRange(0); setOnlineOnly(false); setSearchQuery(''); }}
                 style={{ marginTop: '8px', padding: '10px 20px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                 Clear all filters
               </button>
@@ -332,9 +350,8 @@ function DoctorCard({ doctor, presenceStatus }) {
 
   return (
     <div
-      style={{ display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.07)', borderRadius: '20px', padding: '24px', gap: '20px', transition: 'all 0.2s' }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.13)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+      className="neon-glass-card obsidian-card"
+      style={{ display: 'flex', flexDirection: 'column', borderRadius: '20px', padding: '24px', gap: '20px', transition: 'all 0.2s' }}
     >
       {/* Top: avatar + name + online status */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -360,7 +377,7 @@ function DoctorCard({ doctor, presenceStatus }) {
       {/* Tags */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
         {tags.map(tag => (
-          <span key={tag} style={{ padding: '4px 12px', borderRadius: '99px', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: '500' }}>
+          <span key={tag} style={{ padding: '4px 12px', borderRadius: '99px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: '500' }}>
             {tag}
           </span>
         ))}

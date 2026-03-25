@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Camera, X, Save, User, Activity } from 'lucide-react';
 import toast from 'react-hot-toast';
+import UniversalAvatar from '@/components/UniversalAvatar';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 const GENDERS      = ['male', 'female', 'other'];
@@ -140,14 +141,10 @@ export default function PatientProfile() {
 
             {/* Avatar */}
             <div style={{ position: 'relative' }}>
-              {form.avatar ? (
-                <img src={form.avatar} alt="avatar"
-                  style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.1)' }} />
-              ) : (
-                <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ fontSize: '28px', fontWeight: '800', color: '#60a5fa' }}>{getInitials(form.name)}</span>
-                </div>
-              )}
+              <UniversalAvatar 
+                user={{ ...user, avatar: form.avatar, gender: form.gender }} 
+                size="size-20" 
+              />
               {/* Camera button */}
               <button type="button" onClick={() => fileRef.current?.click()}
                 style={{ position: 'absolute', bottom: '0', right: '0', width: '26px', height: '26px', borderRadius: '50%', background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 2, transition: 'all 0.15s' }}

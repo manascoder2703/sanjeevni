@@ -28,10 +28,11 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import UniversalAvatar from './UniversalAvatar';
 
-const ACCENT = '#18b6a2';
-const SHELL_BG = '#06090f';
-const LEFT_BG = '#0b1017';
+const ACCENT   = '#18b6a2'; // Restore beloved teal accent
+const SHELL_BG = 'rgba(0,0,0,0.2)'; 
+const LEFT_BG  = 'rgba(0,0,0,0.1)';
 
 const QUICK_ACTIONS = [
   { key: 'follow-up', label: 'Book follow-up', icon: CalendarPlus, text: 'Let us plan a follow-up consultation to review your progress and symptoms.' },
@@ -40,7 +41,7 @@ const QUICK_ACTIONS = [
 ];
 
 const AVATARS = [
-  { bg: '#dbf3ed', text: '#0f766e' },
+  { bg: 'rgba(255,255,255,0.08)', text: 'rgba(255,255,255,0.85)' },
   { bg: '#e7eefb', text: '#1d4ed8' },
   { bg: '#f7ead6', text: '#a16207' },
   { bg: '#efe8fb', text: '#7c3aed' },
@@ -683,7 +684,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
     <div style={{ width: '100%', height: '100%', minHeight: 0, alignSelf: 'stretch', display: 'flex', flexDirection: 'column' }}>
       <style>{`
         .chat-workspace { height:100%; min-height:0; width:100%; display:flex; flex:1; overflow:hidden; }
-        .chat-shell { display:flex; height:100%; min-height:0; width:100%; overflow:hidden; background:linear-gradient(180deg,rgba(7,10,16,0.98),rgba(5,8,13,0.99)); }
+        .chat-shell { display:flex; height:100%; min-height:0; width:100%; overflow:hidden; background: transparent; }
         .chat-scroll { scroll-behavior: smooth; }
         .chat-scroll::-webkit-scrollbar { width:8px; }
         .chat-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.2); border-radius:999px; }
@@ -714,25 +715,25 @@ export default function PortalChatWorkspace({ viewerRole }) {
         <div className="chat-shell">
 
           {/* ── LEFT SIDEBAR ─────────────────────────────────────────────── */}
-          <aside className="chat-left" style={{ 
-            background: 'linear-gradient(180deg,rgba(10,14,21,0.98),rgba(8,11,18,0.98))', 
-            borderRight: '1px solid rgba(255,255,255,0.08)', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            height: '100%', 
-            minHeight: 0, 
-            overflow: 'hidden',
-            width: isSidebarCollapsed ? 0 : 440,
-            opacity: isSidebarCollapsed ? 0 : 1,
-            maxWidth: isSidebarCollapsed ? 0 : 440,
-            minWidth: isSidebarCollapsed ? 0 : 440,
-            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-            pointerEvents: isSidebarCollapsed ? 'none' : 'auto',
-          }}>
-            <div style={{ padding: '28px 28px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <aside className="chat-left" style={{ 
+              background: 'rgba(0,0,0,0.2)', 
+              borderRight: '1px solid rgba(255,255,255,0.2)', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              height: '100%', 
+              minHeight: 0, 
+              overflow: 'hidden',
+              width: isSidebarCollapsed ? 0 : 440,
+              opacity: isSidebarCollapsed ? 0 : 1,
+              maxWidth: isSidebarCollapsed ? 0 : 440,
+              minWidth: isSidebarCollapsed ? 0 : 440,
+              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+              pointerEvents: isSidebarCollapsed ? 'none' : 'auto',
+            }}>
+            <div style={{ padding: '28px 28px 18px', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ width: 72, height: 72, borderRadius: '50%', background: selfTone.bg, color: selfTone.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 800 }}>{initials(user?.name || 'S')}</div>
+                  <UniversalAvatar user={user} size="size-20" />
                   <div>
                     <h2 style={{ margin: 0, color: 'white', fontSize: 24, fontWeight: 800 }}>{user?.name || 'Sanjeevni User'}</h2>
                     <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.72)', fontSize: 18 }}>{selfLabel}</p>
@@ -740,13 +741,13 @@ export default function PortalChatWorkspace({ viewerRole }) {
                 </div>
                 <span style={{ width: 18, height: 18, borderRadius: '50%', background: ACCENT }} />
               </div>
-              <div style={{ marginTop: 22, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, borderRadius: 18, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.025)' }}>
+              <div style={{ marginTop: 22, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, borderRadius: 18, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.03)' }}>
                 <Search size={22} color="rgba(255,255,255,0.56)" />
                 <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={searchLabel} style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', color: 'white', fontSize: 18 }} />
               </div>
             </div>
 
-            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
               <button type="button" className={`chat-tab ${tab === 'active' ? 'active' : ''}`} onClick={() => setTab('active')}>
                 Active {activeCount > 0 ? `(${activeCount})` : ''}
               </button>
@@ -755,7 +756,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
               </button>
             </div>
 
-            <div className="chat-scroll" style={{ overflowY: 'auto', flex: 1 }}>
+            <div className="chat-scroll" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
               {loading ? (
                 <div style={{ padding: 28, color: 'rgba(255,255,255,0.56)' }}>Loading chats...</div>
               ) : filteredConversations.length === 0 ? (
@@ -769,10 +770,10 @@ export default function PortalChatWorkspace({ viewerRole }) {
                     type="button"
                     className={`chat-row ${c._id === selectedId ? 'selected' : ''}`}
                     onClick={() => { setSelectedId(c._id); setShowProfile(false); setConfirmDelete(false); }}
-                    style={{ width: '100%', padding: '22px 26px', display: 'flex', gap: 16, border: 'none', borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ width: '100%', padding: '22px 26px', display: 'flex', gap: 16, border: 'none', borderBottom: '1px solid rgba(255,255,255,0.2)', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}
                   >
                     <div style={{ position: 'relative', flexShrink: 0 }}>
-                      <div style={{ width: 66, height: 66, borderRadius: '50%', background: tone.bg, color: tone.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 800 }}>{initials(c.counterpart.name)}</div>
+                      <UniversalAvatar user={c.counterpart} size="size-[66px]" />
                       <span style={{ position: 'absolute', right: 2, bottom: 2, width: 14, height: 14, borderRadius: '50%', background: online ? ACCENT : 'rgba(255,255,255,0.24)', border: `2px solid ${LEFT_BG}` }} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -799,7 +800,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
           <section
             onMouseEnter={() => setIsSidebarCollapsed(true)}
             style={{ 
-              background: 'linear-gradient(180deg,rgba(7,10,16,0.96),rgba(5,8,12,0.99))', 
+              background: 'transparent', 
               display: 'flex', 
               flexDirection: 'column', 
               minWidth: 0, 
@@ -815,47 +816,51 @@ export default function PortalChatWorkspace({ viewerRole }) {
                 type="button"
                 onMouseEnter={(e) => {
                   setIsSidebarCollapsed(false);
-                  e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
-                  e.currentTarget.style.background = 'rgba(24, 182, 162, 0.2)';
+                  e.currentTarget.style.transform = 'translateY(-50%) scale(1.15)';
+                  e.currentTarget.style.background = 'rgba(24, 182, 162, 0.25)';
+                  e.currentTarget.style.boxShadow = '0 0 24px rgba(24, 182, 162, 0.35)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
-                  e.currentTarget.style.background = 'rgba(24, 182, 162, 0.08)';
+                  e.currentTarget.style.background = 'rgba(24, 182, 162, 0.12)';
+                  e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.3)';
                 }}
                 style={{
                   position: 'absolute',
                   left: 0,
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  width: 48,
-                  height: 90,
-                  background: 'rgba(24, 182, 162, 0.08)',
-                  backdropFilter: 'blur(8px)',
-                  border: '1px solid rgba(24, 182, 162, 0.3)',
+                  width: 54,
+                  height: 110,
+                  background: 'rgba(24, 182, 162, 0.12)',
+                  backdropFilter: 'blur(12px)',
+                  borderTop: '1px solid rgba(24, 182, 162, 0.45)',
+                  borderRight: '1px solid rgba(24, 182, 162, 0.45)',
+                  borderBottom: '1px solid rgba(24, 182, 162, 0.45)',
                   borderLeft: 'none',
-                  borderRadius: '0 24px 24px 0',
-                  color: ACCENT,
+                  borderRadius: '0 32px 32px 0',
+                  color: 'white',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  zIndex: 110,
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: '0 0 20px rgba(0,0,0,0.4)',
+                  zIndex: 200,
+                  transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
                 }}
               >
-                <ChevronRight size={28} style={{ filter: 'drop-shadow(0 0 4px #18b6a2)' }} />
+                <ChevronRight size={32} style={{ filter: 'drop-shadow(0 0 8px rgba(24, 182, 162, 0.8))' }} />
               </button>
             )}
-            <div style={{ position: 'absolute', inset: '0 0 auto 0', height: 220, background: 'radial-gradient(circle at top left,rgba(24,182,162,0.12),transparent 42%),radial-gradient(circle at top right,rgba(59,130,246,0.08),transparent 36%)', pointerEvents: 'none' }} />
+            {/* Top Atmospheric Gradient Removed */}
 
             {selectedConversation ? (
               <>
                 {/* Header */}
-                <header style={{ padding: '20px 28px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', background: 'rgba(255,255,255,0.015)' }}>
+                <header style={{ position: 'sticky', top: 0, zIndex: 10, padding: '20px 28px', borderBottom: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 18, flexWrap: 'wrap', background: 'rgba(13, 17, 23, 0.9)', backdropFilter: 'blur(16px)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
                     <div style={{ position: 'relative' }}>
-                      <div style={{ width: 60, height: 60, borderRadius: '50%', background: otherTone.bg, color: otherTone.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 22 }}>{initials(selectedConversation.counterpart.name)}</div>
+                      <UniversalAvatar user={selectedConversation.counterpart} size="size-[60px]" />
                       <span style={{ position: 'absolute', right: 1, bottom: 1, width: 14, height: 14, borderRadius: '50%', background: selectedOnline ? ACCENT : 'rgba(255,255,255,0.24)', border: `2px solid ${SHELL_BG}` }} />
                     </div>
                     <div>
@@ -906,7 +911,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
                 </header>
 
                 {/* Messages */}
-                <div className="chat-scroll" style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '28px 28px 12px', background: 'radial-gradient(circle at top left,rgba(24,182,162,0.08),transparent 26%),radial-gradient(circle at bottom right,rgba(59,130,246,0.08),transparent 24%)' }}>
+                <div className="chat-scroll" style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '28px 28px 12px', background: 'transparent' }}>
                   {conversationLoading ? (
                     <div style={{ color: 'rgba(255,255,255,0.6)' }}>Loading messages...</div>
                   ) : entries.length === 0 ? (
@@ -920,86 +925,86 @@ export default function PortalChatWorkspace({ viewerRole }) {
                       </div>
                     ) : (
                       <div key={entry.id} style={{ marginBottom: 18 }}>
-                          <div style={{ display: 'flex', justifyContent: entry.message.mine ? 'flex-end' : 'flex-start' }}>
-                            <div style={{ maxWidth: '72%' }} className={entry.message._optimistic ? 'msg-optimistic' : ''}>
-                              {entry.message.kind === 'call' ? (
-                                <div style={{ 
-                                  padding: '12px 20px', 
-                                  borderRadius: 22, 
-                                  background: entry.message.mine 
-                                    ? 'linear-gradient(135deg, #18b6a2 0%, #20d4be 45%, #18b6a2 100%)' 
-                                    : 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.18) 45%, rgba(255,255,255,0.1) 100%)', 
-                                  color: 'white', 
-                                  fontSize: 16, 
-                                  fontStyle: 'italic',
-                                  border: `1px solid ${entry.message.mine ? '#18b6a2' : 'rgba(255,255,255,0.12)'}`, 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  gap: 12,
-                                  boxShadow: entry.message.mine ? '0 12px 32px rgba(24,182,162,0.22)' : '0 8px 32px rgba(0,0,0,0.15)',
-                                  backdropFilter: entry.message.mine ? 'none' : 'blur(8px)'
-                                }}>
-                                  {(() => {
-                                    const text = entry.message.text.toLowerCase();
-                                    const isCancelled = (text.includes('no answer') || text.includes('not answered')) && !text.includes('missed');
-                                    const isMissed = text.includes('missed') || text.includes('declined') || text.includes('rejected');
-                                    
-                                    let Icon = entry.message.mine ? PhoneOutgoing : PhoneIncoming;
-                                    let color = 'white'; 
-                                    if (isMissed) color = '#fb7185';
-                                    return <Icon size={18} style={{ color }} />;
-                                  })()}
-                                  {entry.message.text}
-                                </div>
-                              ) : entry.message.kind === 'voice' ? (
-                                <div style={{ 
-                                  padding: '12px 20px', 
-                                  borderRadius: 22, 
-                                  background: entry.message.mine 
-                                    ? 'linear-gradient(135deg, #18b6a2 0%, #20d4be 45%, #18b6a2 100%)' 
-                                    : 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.18) 45%, rgba(255,255,255,0.1) 100%)', 
-                                  color: 'white', 
-                                  border: `1px solid ${entry.message.mine ? '#18b6a2' : 'rgba(255,255,255,0.12)'}`, 
-                                  boxShadow: entry.message.mine ? '0 12px 32px rgba(24,182,162,0.22)' : '0 8px 32px rgba(0,0,0,0.15)',
-                                  backdropFilter: entry.message.mine ? 'none' : 'blur(8px)',
-                                  minWidth: 260
-                                }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, opacity: 0.85 }}>
-                                    <span style={{ fontSize: 13, fontWeight: 700 }}>Voice Note</span>
-                                    <span style={{ fontSize: 13, fontWeight: 700 }}>{Math.floor((entry.message.voiceDuration || 0) / 60)}:{String((entry.message.voiceDuration || 0) % 60).padStart(2, '0')}</span>
-                                  </div>
-                                  <AudioPlayer src={entry.message.text} mine={entry.message.mine} />
-                                </div>
-                              ) : (
-                                <div style={{ 
-                                  padding: '18px 22px', 
-                                  borderRadius: 22, 
-                                  background: entry.message.mine 
-                                    ? 'linear-gradient(135deg, #18b6a2 0%, #20d4be 45%, #18b6a2 100%)' 
-                                    : 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.18) 45%, rgba(255,255,255,0.1) 100%)', 
-                                  color: 'white', 
-                                  fontSize: 18, 
-                                  lineHeight: 1.6, 
-                                  border: `1px solid ${entry.message.mine ? '#18b6a2' : 'rgba(255,255,255,0.12)'}`, 
-                                  boxShadow: entry.message.mine ? '0 12px 32px rgba(24,182,162,0.22)' : '0 8px 32px rgba(0,0,0,0.15)',
-                                  backdropFilter: entry.message.mine ? 'none' : 'blur(8px)'
-                                }}>
-                                  {entry.message.text}
-                                </div>
-                              )}
-                              <div style={{ marginTop: 8, display: 'flex', justifyContent: entry.message.mine ? 'flex-end' : 'flex-start', gap: 6, color: 'rgba(255,255,255,0.56)', fontSize: 14 }}>
-                                <span>{messageTime(entry.message.createdAt)}</span>
-                                {entry.message.mine && (
-                                  <span>· {entry.message._optimistic ? 'Sending…' : entry.message.readAt ? 'Read' : 'Delivered'}</span>
-                                )}
+                        <div style={{ display: 'flex', justifyContent: entry.message.mine ? 'flex-end' : 'flex-start' }}>
+                          <div style={{ maxWidth: '72%' }} className={entry.message._optimistic ? 'msg-optimistic' : ''}>
+                            {entry.message.kind === 'call' ? (
+                              <div style={{ 
+                                padding: '12px 20px', 
+                                borderRadius: 22, 
+                                background: entry.message.mine 
+                                  ? 'linear-gradient(135deg, #18b6a2 0%, #20d4be 45%, #18b6a2 100%)' 
+                                  : 'rgba(255,255,255,0.03)', 
+                                color: 'white', 
+                                fontSize: 16, 
+                                fontStyle: 'italic',
+                                border: `1px solid ${entry.message.mine ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.12)'}`, 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: 12,
+                                boxShadow: entry.message.mine ? '0 12px 32px rgba(24,182,162,0.22)' : '0 8px 32px rgba(0,0,0,0.15)',
+                                backdropFilter: 'blur(8px)'
+                              }}>
+                                {(() => {
+                                  const text = entry.message.text.toLowerCase();
+                                  const isCancelled = (text.includes('no answer') || text.includes('not answered')) && !text.includes('missed');
+                                  const isMissed = text.includes('missed') || text.includes('declined') || text.includes('rejected');
+                                  
+                                  let Icon = entry.message.mine ? PhoneOutgoing : PhoneIncoming;
+                                  let color = 'white'; 
+                                  if (isMissed) color = '#fb7185';
+                                  return <Icon size={18} style={{ color }} />;
+                                })()}
+                                {entry.message.text}
                               </div>
+                            ) : entry.message.kind === 'voice' ? (
+                              <div style={{ 
+                                padding: '12px 20px', 
+                                borderRadius: 22, 
+                                background: entry.message.mine 
+                                  ? 'linear-gradient(135deg, #18b6a2 0%, #20d4be 45%, #18b6a2 100%)' 
+                                  : 'rgba(255,255,255,0.03)', 
+                                color: 'white', 
+                                border: `1px solid ${entry.message.mine ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.12)'}`, 
+                                boxShadow: entry.message.mine ? '0 12px 32px rgba(24,182,162,0.22)' : '0 8px 32px rgba(0,0,0,0.15)',
+                                backdropFilter: 'blur(8px)',
+                                minWidth: 260
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, opacity: 0.85 }}>
+                                  <span style={{ fontSize: 13, fontWeight: 700 }}>Voice Note</span>
+                                  <span style={{ fontSize: 13, fontWeight: 700 }}>{Math.floor((entry.message.voiceDuration || 0) / 60)}:{String((entry.message.voiceDuration || 0) % 60).padStart(2, '0')}</span>
+                                </div>
+                                <AudioPlayer src={entry.message.text} mine={entry.message.mine} />
+                              </div>
+                            ) : (
+                              <div style={{ 
+                                padding: '18px 22px', 
+                                borderRadius: 22, 
+                                background: entry.message.mine 
+                                  ? 'linear-gradient(135deg, #18b6a2 0%, #20d4be 45%, #18b6a2 100%)' 
+                                  : 'rgba(255,255,255,0.03)', 
+                                color: 'white', 
+                                fontSize: 18, 
+                                lineHeight: 1.6, 
+                                border: `1px solid ${entry.message.mine ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.12)'}`, 
+                                boxShadow: entry.message.mine ? '0 12px 32px rgba(24,182,162,0.22)' : '0 8px 32px rgba(0,0,0,0.15)',
+                                backdropFilter: 'blur(8px)'
+                              }}>
+                                {entry.message.text}
+                              </div>
+                            )}
+                            <div style={{ marginTop: 8, display: 'flex', justifyContent: entry.message.mine ? 'flex-end' : 'flex-start', gap: 6, color: 'rgba(255,255,255,0.56)', fontSize: 14 }}>
+                              <span>{messageTime(entry.message.createdAt)}</span>
+                              {entry.message.mine && (
+                                <span>· {entry.message._optimistic ? 'Sending…' : entry.message.readAt ? 'Read' : 'Delivered'}</span>
+                              )}
                             </div>
                           </div>
+                        </div>
                       </div>
                     )
                   )}
                   {typingUser && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 8 }}>
                       <div style={{ padding: '14px 18px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', display: 'inline-flex', gap: 10 }}>
                         {[0, 1, 2].map((dot) => <span key={dot} style={{ width: 12, height: 12, borderRadius: '50%', background: ACCENT }} />)}
                       </div>
@@ -1009,7 +1014,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
                 </div>
 
                 {/* Input */}
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '16px 28px 26px', background: 'rgba(255,255,255,0.015)' }}>
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.2)', padding: '16px 28px 26px', background: 'rgba(255,255,255,0.015)' }}>
                   {viewerRole === 'doctor' && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
                       {QUICK_ACTIONS.map((action) => (
@@ -1019,7 +1024,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
                           className="chat-chip"
                           onClick={() => sendMessage(action.text, 'quick-action')}
                           disabled={isMessagingLocked}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderRadius: 999, border: '1px solid rgba(203,255,244,0.42)', background: '#dff8ef', color: '#0f766e', fontSize: 15, cursor: isMessagingLocked ? 'not-allowed' : 'pointer', opacity: isMessagingLocked ? 0.45 : 1 }}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderRadius: 999, border: '1px solid rgba(24,182,162,0.3)', background: 'rgba(24,182,162,0.08)', color: 'rgba(255,255,255,0.85)', fontSize: 15, cursor: isMessagingLocked ? 'not-allowed' : 'pointer', opacity: isMessagingLocked ? 0.45 : 1 }}
                         >
                           <action.icon size={18} />{action.label}
                         </button>
@@ -1028,7 +1033,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
                         type="button"
                         className="chat-chip"
                         onClick={toggleUrgent}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderRadius: 999, border: '1px solid rgba(243,186,82,0.8)', background: selectedConversation.urgent ? 'rgba(243,186,82,0.16)' : '#fff4df', color: '#a16207', fontSize: 15, cursor: 'pointer' }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '12px 20px', borderRadius: 999, border: '1px solid rgba(243,186,82,0.4)', background: selectedConversation.urgent ? 'rgba(243,186,82,0.16)' : 'rgba(243,186,82,0.08)', color: '#f3ba52', fontSize: 15, cursor: 'pointer' }}
                       >
                         <ShieldAlert size={18} />
                         {selectedConversation.urgent ? 'Remove urgent' : 'Mark as urgent'}
@@ -1140,7 +1145,7 @@ export default function PortalChatWorkspace({ viewerRole }) {
             <div style={{ position: 'absolute', inset: '0 0 auto 0', height: 160, background: 'radial-gradient(circle at top left,rgba(24,182,162,0.15),transparent 70%)', pointerEvents: 'none' }} />
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, position: 'relative', zIndex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                <div style={{ width: 84, height: 84, borderRadius: '50%', background: otherTone.bg, color: otherTone.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 800, border: '4px solid rgba(255,255,255,0.05)' }}>{initials(selectedConversation.counterpart.name)}</div>
+                <UniversalAvatar user={selectedConversation.counterpart} size="size-[84px]" />
                 <div>
                   <h3 style={{ margin: 0, color: 'white', fontSize: 28, fontWeight: 900, letterSpacing: '-0.5px' }}>{selectedConversation.counterpart.name}</h3>
                   <p style={{ margin: '8px 0 0', color: ACCENT, fontSize: 17, fontWeight: 700 }}>

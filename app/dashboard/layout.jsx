@@ -9,20 +9,21 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
-import React, { useEffect, useRef, useState } from "react"
+import React, { useEffect, useState } from "react"
 import CommandPalette from "@/components/CommandPalette"
 import { NotificationProvider } from "@/context/NotificationContext"
-import NotificationBell from "@/components/NotificationBell"
 import { CallProvider } from "@/context/CallContext"
 import AudioCallOverlay from "@/components/AudioCallOverlay"
+import AIAgentWidget from "@/components/ai/AIAgentWidget"
+import IntegratedHeader from "@/components/IntegratedHeader"
+import Particles from "@/components/Particles"
+import { AgentProvider } from "@/context/AgentContext"
 
 export default function DashboardLayout({ children }) {
   const { user, loading } = useAuth()
@@ -40,12 +41,10 @@ export default function DashboardLayout({ children }) {
   const isFullWidthPage = isChatPage
 
   useEffect(() => {
-    // Only proceed once loading from context is finished
     if (!loading) {
       if (user) {
         setIsReady(true);
       } else {
-        // Double check: if no user is found after loading, go to login
         const timeout = setTimeout(() => {
           if (!user) router.push("/login");
         }, 500);
@@ -55,10 +54,9 @@ export default function DashboardLayout({ children }) {
   }, [user, loading, router]);
 
 
-  // Only show loading if we are truly loading and don't have a user yet
   if ((loading || !isReady) && !user) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#000000]">
+      <div className="flex h-screen w-full items-center justify-center bg-[#020617]">
         <div className="flex flex-col items-center gap-4">
           <div className="size-12 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
           <p className="text-white/60 animate-pulse font-medium">Securing session...</p>
@@ -68,7 +66,9 @@ export default function DashboardLayout({ children }) {
   }
 
   const pathSegments = pathname.split('/').filter(Boolean)
-  const filteredSegments = pathSegments[0] === 'dashboard' ? pathSegments.slice(1) : pathSegments
+  const filteredSegments = pathSegments[0] === 'dashboard' 
+    ? pathSegments.slice(2) 
+    : pathSegments
 
   const breadcrumbs = filteredSegments.map((segment, index) => {
     const actualIndex = pathSegments.indexOf(segment)
@@ -81,66 +81,86 @@ export default function DashboardLayout({ children }) {
   return (
     <NotificationProvider>
       <CallProvider>
-        <SidebarProvider>
-          <CommandPalette />
-          <AppSidebar />
-          <SidebarInset className={`bg-[#000000] text-white relative overflow-hidden flex flex-col ${isFullWidthPage ? 'h-screen' : 'min-h-screen'}`}>
+        <AgentProvider>
+          <SidebarProvider>
+          <div className="flex flex-col h-screen w-full text-white relative overflow-hidden">
+            {/* GLOBAL BACKGROUNDS */}
             <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-0"
               style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
-            <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-blue-500/5 blur-[120px] pointer-events-none z-0"></div>
-
-            <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/5 px-6 md:px-8 sticky top-0 bg-[#000000]/80 backdrop-blur-md z-50">
-              <div className="flex items-center gap-2">
-                <SidebarTrigger className="-ml-2 opacity-100 transition-opacity text-white" />
-                <Separator
-                  orientation="vertical"
-                  className="mx-2 h-4 bg-white/10"
-                />
-                <Breadcrumb>
-                  <BreadcrumbList>
-                    <BreadcrumbItem className="hidden md:block">
-                      <BreadcrumbPage className="text-white font-medium">
-                        Sanjeevni
-                      </BreadcrumbPage>
-                    </BreadcrumbItem>
-                    {breadcrumbs.slice(1).map((bc, i) => (
-                      <React.Fragment key={bc.href}>
-                        <BreadcrumbSeparator className="hidden md:block text-white/10" />
-                        <BreadcrumbItem>
-                          {bc.isLast ? (
-                            <BreadcrumbPage className="text-white font-semibold tracking-tight">{bc.label}</BreadcrumbPage>
-                          ) : (
-                            <BreadcrumbLink href={bc.href} className="text-white/40 hover:text-white transition-colors capitalize font-medium">
-                              {bc.label}
-                            </BreadcrumbLink>
-                          )}
-                        </BreadcrumbItem>
-                      </React.Fragment>
-                    ))}
-                  </BreadcrumbList>
-                </Breadcrumb>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <NotificationBell />
-              </div>
-            </header>
-
-            <div
-              className={`flex-1 relative z-10 custom-scrollbar flex flex-col min-h-0 ${isFullWidthPage ? "items-stretch overflow-hidden" : "items-center overflow-y-auto"}`}
-              style={{
-                paddingLeft: isFullWidthPage ? '0' : '2.5rem',
-                paddingRight: isFullWidthPage ? '0' : '2.5rem',
-                paddingTop: isFullWidthPage ? '0' : '2rem',
-                paddingBottom: isFullWidthPage ? '0' : '2rem',
-              }}
-            >
-              {children}
+            
+            {/* CINEMATIC PARTICLES LAYER (Whole Portal Atmosphere) */}
+            <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+              <Particles
+                particleColors={["#ffffff"]}
+                particleCount={250}
+                particleSpread={12}
+                speed={0.1}
+                particleBaseSize={100}
+                moveParticlesOnHover
+                alphaParticles={false}
+                disableRotation={false}
+                pixelRatio={1}
+              />
             </div>
-          </SidebarInset>
+            {/* SOFT ATMOSPHERIC GLOWS (Neutral depth) */}
+            <div className="fixed inset-0 pointer-events-none z-0"></div>
+
+            <CommandPalette />
+            
+            {/* FIXED TOP HEADER */}
+            <div className="fixed top-0 left-0 w-full h-16 z-[100] bg-[#030303]/40 backdrop-blur-md border-b border-white/10">
+              <IntegratedHeader />
+            </div>
+
+            <div className="flex flex-1 overflow-hidden relative z-10 w-full h-screen">
+              <AppSidebar />
+              
+              <main className={`flex-1 ${isFullWidthPage ? "overflow-hidden p-0!" : "overflow-y-auto p-8! md:px-20! md:py-12!"} custom-scrollbar flex flex-col relative pt-16!`}>
+                {/* EXPANSIVE CONTENT CONTAINER */}
+                <div className="w-full flex-1 min-h-0 flex flex-col relative">
+                  {/* PAGE CONTENT INNER (NO OUTER CARD) */}
+                  <div 
+                    className={`flex-1 min-h-0 flex flex-col ${isFullWidthPage ? "p-0!" : "p-8! md:px-20! md:py-12!"}`}
+                  >
+                    {/* BREADCRUMBS MODULAR PILL */}
+                    {!isFullWidthPage && breadcrumbs.length > 0 && (
+                      <div className="mb-8 flex items-center gap-3 px-4 py-2 bg-white/[0.03] border border-white/5 rounded-full w-fit backdrop-blur-md">
+                        <Breadcrumb>
+                          <BreadcrumbList>
+                            {breadcrumbs.map((bc, i) => (
+                              <React.Fragment key={bc.href}>
+                                <BreadcrumbItem>
+                                  {bc.isLast ? (
+                                    <BreadcrumbPage className="text-white font-bold tracking-tight text-sm">{bc.label}</BreadcrumbPage>
+                                  ) : (
+                                    <BreadcrumbLink href={bc.href} className="text-white/30 hover:text-white transition-colors font-semibold tracking-wide text-xs">
+                                      {bc.label}
+                                    </BreadcrumbLink>
+                                  )}
+                                </BreadcrumbItem>
+                                {!bc.isLast && <BreadcrumbSeparator className="text-white/5 size-3" />}
+                              </React.Fragment>
+                            ))}
+                          </BreadcrumbList>
+                        </Breadcrumb>
+                      </div>
+                    )}
+
+                    {/* MAIN CHILDREN CONTENT */}
+                    <div className="flex-1 min-h-0">
+                      {children}
+                    </div>
+                  </div>
+                </div>
+              </main>
+            </div>
+
+            <AudioCallOverlay />
+            <AIAgentWidget />
+          </div>
         </SidebarProvider>
-        <AudioCallOverlay />
-      </CallProvider>
-    </NotificationProvider>
+      </AgentProvider>
+    </CallProvider>
+  </NotificationProvider>
   )
 }

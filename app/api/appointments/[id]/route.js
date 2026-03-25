@@ -4,7 +4,9 @@ import Appointment from '@/models/Appointment';
 import { getUserFromRequest } from '@/lib/auth';
 import { sendRealtimeNotification } from '@/lib/notifications';
 import Doctor from '@/models/Doctor';
+import User from '@/models/User';
 import axios from 'axios';
+import { sendAppointmentConfirmedToPatient } from '@/lib/email';
 
 const ALLOWED_STATUSES = new Set(['pending', 'confirmed', 'completed', 'cancelled', 'rejected']);
 const SOCKET_SERVER = process.env.SOCKET_SERVER_INTERNAL || 'http://localhost:3001';
@@ -69,8 +71,24 @@ export async function PATCH(request, { params }) {
         type: 'approval',
         link: '/dashboard/patient'
       });
+
+      // Send confirmation email if status changed to confirmed
+      if (status === 'confirmed') {
+        const patient = await User.findById(appointment.patientId);
+        const doctor = await Doctor.findById(appointment.doctorId).populate('userId', 'name');
+        if (patient && doctor) {
+          await sendAppointmentConfirmedToPatient({
+            patientEmail: patient.email,
+            patientName: patient.name,
+            doctorName: doctor.userId.name,
+            date: appointment.date,
+            timeSlot: appointment.timeSlot,
+            appointmentId: appointment._id.toString().slice(-6).toUpperCase()
+          });
+        }
+      }
     } catch (notifyErr) {
-      console.warn('Real-time notification failed:', notifyErr.message);
+      console.warn('Real-time notification or email failed:', notifyErr.message);
     }
 
     return NextResponse.json({ appointment });

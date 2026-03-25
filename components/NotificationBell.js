@@ -24,7 +24,7 @@ export default function NotificationBell() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2.5 rounded-xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.08] transition-all group"
+        className="relative p-3! rounded-xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.08] transition-all group"
       >
         <Bell 
           className={`size-5 transition-colors ${unreadCount > 0 ? 'text-red-500 fill-red-500/10' : 'text-white/40 group-hover:text-white'}`} 
@@ -50,9 +50,9 @@ export default function NotificationBell() {
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute right-0 mt-3 w-80 bg-black/80 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 overflow-hidden"
+            className="absolute right-0 mt-3 w-80 bg-black/80 backdrop-blur-2xl border border-white/10 rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 overflow-visible!"
           >
-            <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+            <div className="p-5! border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
               <h3 className="text-sm font-bold tracking-tight">Notifications</h3>
               {notifications.length > 0 && (
                 <button 
@@ -66,7 +66,7 @@ export default function NotificationBell() {
 
             <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
               {notifications.length === 0 ? (
-                <div className="p-10 flex flex-col items-center justify-center opacity-20">
+                <div className="p-12! pb-16! flex flex-col items-center justify-center opacity-20">
                   <Bell className="size-10 mb-3" />
                   <p className="text-xs font-medium">No new notifications</p>
                 </div>

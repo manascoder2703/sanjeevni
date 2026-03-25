@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useNotifications } from '@/context/NotificationContext';
 import toast from 'react-hot-toast';
+import PatientCalendar from '@/components/PatientCalendar';
 
 function getInitials(name = '') {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -72,6 +73,8 @@ export default function PatientDashboard() {
   const [reviewForm, setReviewForm] = useState({ doctorRating: 0, platformRating: 0, comment: '' });
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewedIds, setReviewedIds] = useState(new Set());
+  const [height, setHeight] = useState(175);
+  const [weight, setWeight] = useState(70);
 
   const fetchAppointments = useCallback(async () => {
     try {
@@ -147,7 +150,7 @@ export default function PatientDashboard() {
   const total          = appointments.length;
   const completed      = appointments.filter(a => a.status === 'completed').length;
   const doctorsVisited = new Set(appointments.map(a => a.doctorId?._id || a.doctorId)).size;
-  const healthScore    = total === 0 ? 0 : Math.min(98, Math.round(60 + (completed / Math.max(total, 1)) * 38));
+  const bmiValue       = (weight / ((height / 100) ** 2)).toFixed(1);
   const firstName      = user?.name?.split(' ')[0] || 'Patient';
   const hour           = new Date().getHours();
   const greeting       = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
@@ -158,7 +161,7 @@ export default function PatientDashboard() {
     { id: 'cancelled', label: 'Cancelled', icon: XCircle,      count: cancelledAppointments.length },
   ];
 
-  const card = { background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: '24px' };
+  // Premium Neon Card Style handled by 'neon-glass-card' CSS class
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%', paddingBottom: '80px' }}>
@@ -166,9 +169,9 @@ export default function PatientDashboard() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.2)' }}>{greeting}</span>
+          <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.2em', color: '#94a3b8' }}>{greeting}</span>
           <h1 style={{ fontSize: '30px', fontWeight: '900', color: '#fff', letterSpacing: '-0.5px', margin: 0 }}>
-            {firstName} <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span> <span style={{ color: '#3b82f6' }}>Patient Portal</span>
+            {firstName} <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span> <span style={{ color: '#22d3ee' }}>Patient Portal</span>
           </h1>
         </div>
         <Link href="/dashboard/patient/doctors" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 28px', borderRadius: '99px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.03)', color: '#fff', fontSize: '14px', fontWeight: '600', textDecoration: 'none', transition: 'all 0.2s' }}
@@ -181,12 +184,12 @@ export default function PatientDashboard() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
         {[
-          { label: 'Total Consultations', value: total,             icon: CalendarDays, iconColor: '#60a5fa',  iconBg: 'rgba(59,130,246,0.12)' },
-          { label: 'Completed',           value: completed,         icon: CheckCircle2, iconColor: '#4ade80',  iconBg: 'rgba(34,197,94,0.12)' },
-          { label: 'Doctors Visited',     value: doctorsVisited,    icon: Users,        iconColor: '#a78bfa',  iconBg: 'rgba(139,92,246,0.12)' },
-          { label: 'Health Score',        value: `${healthScore}%`, icon: Activity,     iconColor: '#fbbf24',  iconBg: 'rgba(245,158,11,0.12)' },
+          { label: 'Total Consultations', value: total,             icon: CalendarDays, iconColor: '#3b82f6',  iconBg: 'rgba(59,130,246,0.2)' },
+          { label: 'Completed',           value: completed,         icon: CheckCircle2, iconColor: '#10b981',  iconBg: 'rgba(16,185,129,0.2)' },
+          { label: 'Doctors Visited',     value: doctorsVisited,    icon: Users,        iconColor: '#8b5cf6',  iconBg: 'rgba(139,92,246,0.2)' },
+          { label: 'BMI Score',           value: bmiValue,          icon: Activity,     iconColor: '#f59e0b',  iconBg: 'rgba(245,158,11,0.2)' },
         ].map(stat => (
-          <div key={stat.label} style={{ ...card, padding: '28px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', minHeight: '140px', textAlign: 'center', cursor: 'default' }}>
+          <div key={stat.label} className="neon-glass-card obsidian-card" style={{ padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: '24px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
             <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: stat.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <stat.icon size={22} style={{ color: stat.iconColor }} />
             </div>
@@ -202,7 +205,7 @@ export default function PatientDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
 
         {/* Today */}
-        <div style={{ ...card, padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="neon-glass-card obsidian-card" style={{ padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: '24px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -234,21 +237,21 @@ export default function PatientDashboard() {
                 const { label, color, bg, border, dot } = getStatusConfig(appt.status);
                 const joinState = getJoinState(appt);
                 return (
-                  <div key={appt._id} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.05)', borderRadius: '16px' }}>
+                  <div key={appt._id} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 20px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '16px' }}>
                     <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <span style={{ fontSize: '12px', fontWeight: '700', color: '#60a5fa' }}>{getInitials(docName)}</span>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <p style={{ fontSize: '14px', fontWeight: '700', color: '#fff', margin: 0 }}>Dr. {docName}</p>
+                        <p style={{ fontSize: '15px', fontWeight: '800', color: '#f8fafc', margin: 0 }}>Dr. {docName}</p>
                         {appt.doctorId?.rating > 0 && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '2px 6px', background: 'rgba(245,158,11,0.1)', border: '0.5px solid rgba(245,158,11,0.2)', borderRadius: '6px' }}>
-                            <Star size={9} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                            <span style={{ fontSize: '10px', fontWeight: '700', color: '#fbbf24' }}>{Number(appt.doctorId.rating).toFixed(1)}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', padding: '2px 8px', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: '8px' }}>
+                            <Star size={10} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
+                            <span style={{ fontSize: '10px', fontWeight: '800', color: '#fbbf24' }}>{Number(appt.doctorId.rating).toFixed(1)}</span>
                           </div>
                         )}
                       </div>
-                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>{appt.doctorId?.specialization || 'Specialist'} · {appt.timeSlot}</p>
+                      <p style={{ fontSize: '12px', fontWeight: '600', color: '#94a3b8', margin: '3px 0 0' }}>{appt.doctorId?.specialization || 'Specialist'} · {appt.timeSlot}</p>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '99px', background: bg, border: `1px solid ${border}`, flexShrink: 0 }}>
                       <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: dot, flexShrink: 0 }} />
@@ -271,48 +274,8 @@ export default function PatientDashboard() {
           )}
         </div>
 
-        {/* Health Score */}
-        <div style={{ ...card, padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Activity size={16} style={{ color: '#fbbf24' }} />
-            </div>
-            <span style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>Health Score</span>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-            <div style={{ position: 'relative', width: '130px', height: '130px' }}>
-              <svg style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }} viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8" />
-                <circle cx="50" cy="50" r="42" fill="none" stroke="#3b82f6" strokeWidth="9" strokeLinecap="round"
-                  strokeDasharray="264" strokeDashoffset={264 - (2.64 * healthScore)} style={{ transition: 'stroke-dashoffset 1s ease-out' }} />
-              </svg>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: '32px', fontWeight: '900', color: '#fff', lineHeight: 1 }}>{healthScore}</span>
-                <span style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.2em' }}>Score</span>
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 16px', borderRadius: '99px', border: `1px solid ${healthScore >= 80 ? 'rgba(34,197,94,0.2)' : healthScore >= 60 ? 'rgba(245,158,11,0.2)' : 'rgba(244,63,94,0.2)'}`, background: healthScore >= 80 ? 'rgba(34,197,94,0.1)' : healthScore >= 60 ? 'rgba(245,158,11,0.1)' : 'rgba(244,63,94,0.1)' }}>
-              <Zap size={10} style={{ color: healthScore >= 80 ? '#4ade80' : healthScore >= 60 ? '#fbbf24' : '#fb7185' }} />
-              <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', color: healthScore >= 80 ? '#4ade80' : healthScore >= 60 ? '#fbbf24' : '#fb7185' }}>
-                {healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : 'Needs attention'}
-              </span>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: 'auto' }}>
-            {[
-              { label: 'Appointments kept', value: `${completed}/${total}` },
-              { label: 'Doctors consulted', value: doctorsVisited },
-              { label: 'Cancellation rate', value: total > 0 ? `${Math.round((cancelledAppointments.length / total) * 100)}%` : '0%' },
-            ].map((item, i) => (
-              <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 2 ? '0.5px solid rgba(255,255,255,0.04)' : 'none' }}>
-                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: '500' }}>{item.label}</span>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: '#fff' }}>{item.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Obsidian Appointment Calendar (Replaced BMI Calculator) */}
+        <PatientCalendar appointments={appointments} />
       </div>
 
       {/* Upcoming */}
@@ -331,7 +294,7 @@ export default function PatientDashboard() {
               const docName = appt.doctorId?.userId?.name || 'Doctor';
               const { label, color, bg, border, dot } = getStatusConfig(appt.status);
               return (
-                <div key={appt._id} style={{ ...card, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div key={appt._id} className="neon-glass-card obsidian-card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <span style={{ fontSize: '12px', fontWeight: '700', color: '#a78bfa' }}>{getInitials(docName)}</span>
@@ -350,7 +313,7 @@ export default function PatientDashboard() {
                       <Clock size={11} style={{ color: 'rgba(59,130,246,0.5)' }} /> {appt.timeSlot}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '99px', background: bg, border: `1px solid ${border}`, width: 'fit-content' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '99px', background: 'transparent', border: `1px solid ${border}`, width: 'fit-content' }}>
                     <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: dot }} />
                     <span style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.08em', color }}>{label}</span>
                   </div>
@@ -374,9 +337,9 @@ export default function PatientDashboard() {
             const isActive = activeTab === tab.id;
             return (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: '600', border: `1px solid ${isActive ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.07)'}`, background: isActive ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.02)', color: isActive ? '#fff' : 'rgba(255,255,255,0.35)', cursor: 'pointer', transition: 'all 0.2s' }}
-                onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; }}}
-                onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; }}}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 24px', borderRadius: '12px', fontSize: '14px', fontWeight: '600', border: `1px solid ${isActive ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.1)'}`, background: isActive ? 'rgba(255,255,255,0.08)' : 'transparent', color: isActive ? '#fff' : 'rgba(255,255,255,0.35)', cursor: 'pointer', transition: 'all 0.2s' }}
+                onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; }}}
+                onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'rgba(255,255,255,0.35)'; }}}
               >
                 <tab.icon size={15} />
                 {tab.label}
@@ -389,9 +352,9 @@ export default function PatientDashboard() {
         </div>
 
         {/* Table */}
-        <div style={{ ...card, overflow: 'hidden' }}>
+        <div className="neon-glass-card obsidian-card" style={{ overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
           {/* Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1.4fr 1fr 1.4fr 1.2fr', gap: '16px', padding: '14px 32px', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1.4fr 1fr 1.4fr 1.2fr', gap: '16px', padding: '14px 32px', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: 'transparent' }}>
             {['Doctor', 'Specialty', 'Date', 'Time', 'Status', 'Action'].map((h, i) => (
               <span key={h} style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.2)', textAlign: i === 5 ? 'right' : 'left' }}>{h}</span>
             ))}
@@ -549,9 +512,74 @@ export default function PatientDashboard() {
   );
 }
 
+function BMICalculator({ height, setHeight, weight, setWeight }) {
+  const bmi = (weight / ((height / 100) ** 2)).toFixed(1);
+  
+  const getCategory = (val) => {
+    if (val < 18.5) return { label: 'Underweight', color: '#fbbf24', bg: 'rgba(245,158,11,0.1)' };
+    if (val < 25) return { label: 'Healthy', color: '#4ade80', bg: 'rgba(34,197,94,0.1)' };
+    if (val < 30) return { label: 'Overweight', color: '#f97316', bg: 'rgba(249,115,22,0.1)' };
+    return { label: 'Obese', color: '#ef4444', bg: 'rgba(239,68,68,0.1)' };
+  };
+
+  const cat = getCategory(parseFloat(bmi));
+
+  return (
+    <div className="neon-glass-card obsidian-card" style={{ padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: '24px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Activity size={16} style={{ color: '#60a5fa' }} />
+        </div>
+        <span style={{ fontSize: '15px', fontWeight: '700', color: '#fff' }}>BMI Calculator</span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Height Slider */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Height</span>
+            <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>{height} <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>cm</span></span>
+          </div>
+          <input 
+            type="range" min="100" max="220" value={height} 
+            onChange={(e) => setHeight(parseInt(e.target.value))}
+            style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', appearance: 'none', cursor: 'pointer', outline: 'none' }}
+          />
+        </div>
+
+        {/* Weight Slider */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Weight</span>
+            <span style={{ fontSize: '14px', fontWeight: '800', color: '#fff' }}>{weight} <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>kg</span></span>
+          </div>
+          <input 
+            type="range" min="30" max="150" value={weight} 
+            onChange={(e) => setWeight(parseInt(e.target.value))}
+            style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', appearance: 'none', cursor: 'pointer', outline: 'none' }}
+          />
+        </div>
+      </div>
+
+      {/* BMI Display Card */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '24px', padding: '24px', marginTop: '8px' }}>
+         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '48px', fontWeight: '900', color: '#fff', letterSpacing: '-2px', lineHeight: 1 }}>{bmi}</span>
+            <div style={{ position: 'absolute', bottom: '-15px', padding: '4px 12px', borderRadius: '99px', background: 'transparent', border: `1px solid ${cat.color}33` }}>
+               <span style={{ fontSize: '10px', fontWeight: '800', color: cat.color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{cat.label}</span>
+            </div>
+         </div>
+         <div style={{ width: '100%', height: '6px', background: 'linear-gradient(90deg, #fbbf24 0%, #4ade80 30%, #4ade80 50%, #f97316 70%, #ef4444 100%)', borderRadius: '99px', position: 'relative', marginTop: '12px' }}>
+            <div style={{ position: 'absolute', top: '-4px', left: `${Math.min(100, Math.max(0, (parseFloat(bmi) - 15) * 3.33))}%`, width: '14px', height: '14px', background: '#fff', border: '3px solid #000', borderRadius: '50%', transform: 'translateX(-50%)', transition: 'left 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }} />
+         </div>
+      </div>
+    </div>
+  );
+}
+
 function RatingField({ label, value, onChange, icon: Icon }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div style={{ background: 'transparent', border: 'none', borderRadius: '20px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Icon size={12} style={{ color: 'rgba(255,255,255,0.3)' }} />
           <span style={{ fontSize: '9px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.2)' }}>{label}</span>

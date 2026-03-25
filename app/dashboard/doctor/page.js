@@ -446,9 +446,9 @@ export default function DoctorDashboard() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.2em', color: 'rgba(255,255,255,0.2)', marginBottom: '4px' }}>{greeting}</div>
+          <div style={{ fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.2em', color: '#94a3b8', marginBottom: '4px' }}>{greeting}</div>
           <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#fff', letterSpacing: '-0.5px', margin: 0 }}>
-            Dr. {firstName} <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span> <span style={{ color: '#3b82f6' }}>Doctor Portal</span>
+            Dr. {firstName} <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span> <span style={{ color: '#22d3ee' }}>Doctor Portal</span>
           </h1>
         </div>
         <button 

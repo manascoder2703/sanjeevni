@@ -17,6 +17,8 @@ const AppointmentSchema = new mongoose.Schema(
     roomId: { type: String, default: '' }, // for WebRTC video room
     scheduledDateTime: { type: Date }, // Computed ISO date+time
     isReviewed: { type: Boolean, default: false },
+    doctorReminderSent: { type: Boolean, default: false },
+    joinReminderSent: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

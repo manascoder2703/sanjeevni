@@ -594,9 +594,9 @@ export default function AIAssistantPage() {
   const chatProps = { messages, setMessages, chatId, setChatId, loading: chatLoading, setLoading: setChatLoading };
 
   return (
-    <div style={{ minHeight: '100vh', padding: '32px' }}>
+    <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0, padding: '32px' }}>
       {/* Main Content */}
-      <main style={{ width: '100%', position: 'relative', zIndex: 10 }}>
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, width: '100%', position: 'relative', zIndex: 10 }}>
         {/* Header */}
         <div style={{ marginBottom: 32, position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
@@ -702,17 +702,17 @@ export default function AIAssistantPage() {
         </div>
 
         {/* Tab Content with State Preservation */}
-        <div style={{ display: activeTab === 'symptom-checker' ? 'block' : 'none' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: activeTab === 'symptom-checker' ? 'block' : 'none', paddingRight: 12 }}>
           <SymptomChecker />
         </div>
         
-        <div style={{ display: activeTab === 'health-chat' ? 'block' : 'none' }}>
+        <div style={{ flex: 1, minHeight: 0, display: activeTab === 'health-chat' ? 'flex' : 'none', flexDirection: 'column' }}>
           <HealthChat {...chatProps} />
         </div>
 
-        {activeTab === 'history' && (
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: activeTab === 'history' ? 'block' : 'none', paddingRight: 12 }}>
           <ChatHistory onSelectChat={loadPreviousChat} />
-        )}
+        </div>
       </main>
 
       <style>{`
