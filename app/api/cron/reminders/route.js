@@ -28,6 +28,9 @@ export async function GET(request) {
     const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
     const tenMinutesLater = new Date(now.getTime() + 10 * 60 * 1000);
 
+    console.log(`[CRON] Run at: ${now.toISOString()}`);
+    console.log(`[CRON] Checking for JOINS between: ${now.toISOString()} AND ${tenMinutesLater.toISOString()}`);
+
     // ─── 1. DOCTOR REMINDERS (PENDING) ───────────────────────────────────────────
     // Find pending appointments starting within the next hour that haven't been reminded
     const pendingToNotify = await Appointment.find({
@@ -35,6 +38,8 @@ export async function GET(request) {
       scheduledDateTime: { $gt: now, $lte: oneHourLater },
       doctorReminderSent: { $ne: true }
     }).populate('patientId', 'name').populate({ path: 'doctorId', populate: { path: 'userId', select: 'name email' } });
+
+    console.log(`[CRON] Found ${pendingToNotify.length} pending reminders.`);
 
     for (const appt of pendingToNotify) {
       try {
@@ -62,6 +67,8 @@ export async function GET(request) {
       scheduledDateTime: { $gt: now, $lte: tenMinutesLater },
       joinReminderSent: { $ne: true }
     }).populate('patientId', 'name email').populate({ path: 'doctorId', populate: { path: 'userId', select: 'name email' } });
+
+    console.log(`[CRON] Found ${activeToNotify.length} join session alerts.`);
 
     for (const appt of activeToNotify) {
       try {
