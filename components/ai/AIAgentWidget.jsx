@@ -37,7 +37,6 @@ export default function AIAgentWidget() {
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         setInput(prev => (prev ? `${prev} ${transcript}` : transcript));
-        toast.success("Speech captured!", { duration: 1000 });
       };
 
       recognition.onerror = (event) => {
@@ -153,6 +152,20 @@ export default function AIAgentWidget() {
   };
 
   useEffect(() => {
+    const fetchSession = async () => {
+      try {
+        const res = await fetch('/api/ai/agent/session');
+        const data = await res.json();
+        if (data.messages) setMessages(data.messages);
+        if (data.bookingContext) setBookingContext(data.bookingContext);
+      } catch (err) {
+        console.error("Failed to load AI session:", err);
+      }
+    };
+    fetchSession();
+  }, []);
+
+  useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, loading, isOpen]);
 
@@ -185,12 +198,19 @@ export default function AIAgentWidget() {
       if (parsedData.error) throw new Error(parsedData.error);
       let replyContent = '';
       let actionData = null;
+      let newBookingContext = bookingContext;
+
       switch (parsedData.intent) {
         case 'BOOK_DOCTOR':
-          const ub = mergeBookingParams(bookingContext, parsedData.params);
-          setBookingContext(ub);
-          if (!ub.doctorName || !ub.date || !ub.timeSlot) replyContent = `Need ${!ub.doctorName ? 'doctor name,' : ''} ${!ub.date ? 'date,' : ''} ${!ub.timeSlot ? 'and time' : ''}.`;
-          else { replyContent = `Drafted appointment for ${ub.doctorName} on ${ub.date} at ${ub.timeSlot}.`; actionData = { type: 'ACTION', label: 'Confirm Booking', payload: ub }; }
+        case 'PROVIDE_INFO':
+          newBookingContext = mergeBookingParams(bookingContext, parsedData.params);
+          setBookingContext(newBookingContext);
+          if (!newBookingContext.doctorName || !newBookingContext.date || !newBookingContext.timeSlot) {
+            replyContent = `Need ${!newBookingContext.doctorName ? 'doctor name,' : ''} ${!newBookingContext.date ? 'date,' : ''} ${!newBookingContext.timeSlot ? 'and time' : ''}.`;
+          } else {
+            replyContent = `Drafted appointment for ${newBookingContext.doctorName} on ${newBookingContext.date} at ${newBookingContext.timeSlot}.`;
+            actionData = { type: 'ACTION', label: 'Confirm Booking', payload: newBookingContext };
+          }
           break;
         case 'SEARCH_DOCTORS':
           replyContent = `Searching...`;
@@ -201,7 +221,20 @@ export default function AIAgentWidget() {
           break;
         default: replyContent = "I'm your assistant. How can I help you today?";
       }
-      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'assistant', content: replyContent, action: actionData }]);
+      
+      const assistantMessage = { id: Date.now() + 1, role: 'assistant', content: replyContent, action: actionData };
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      // Update persistent session
+      fetch('/api/ai/agent/session/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          messages: [...messages, { id: Date.now(), role: 'user', content: text }, assistantMessage],
+          bookingContext: newBookingContext
+        })
+      }).catch(e => console.error("Sync error:", e));
+
     } catch (err) { toast.error("Process failed"); } finally { setLoading(false); }
   };
 

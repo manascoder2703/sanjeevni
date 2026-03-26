@@ -3,6 +3,7 @@ import { getUserFromRequest } from '@/lib/auth';
 import { getGeminiModel, INTENT_PARSING_PROMPT } from '@/lib/gemini';
 import connectDB from '@/lib/mongodb';
 import AICache from '@/models/AICache';
+import UserAISession from '@/models/UserAISession';
 
 export async function POST(request) {
   try {
@@ -29,9 +30,25 @@ export async function POST(request) {
       console.error('Cache Lookup Error (Non-fatal):', cacheErr);
     }
 
-    // 2. Use Gemini to parse intent into JSON
+    // 2. Load or create Session
+    let session;
+    try {
+      session = await UserAISession.findOne({ userId: user.userId });
+      if (!session) {
+        session = new UserAISession({ userId: user.userId, messages: [], bookingContext: null });
+      }
+    } catch (sessionErr) {
+      console.error('Session Load Error:', sessionErr);
+    }
+
+    // 3. Use Gemini to parse intent into JSON
     const model = getGeminiModel(INTENT_PARSING_PROMPT);
-    const result = await model.generateContent(`Role: ${role}\nUser Message: ${message.trim()}`);
+    
+    // Provide history for context-aware parsing
+    const historyText = session?.messages?.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n') || '';
+    const contextPrompt = historyText ? `History:\n${historyText}\n\n` : '';
+    
+    const result = await model.generateContent(`${contextPrompt}Role: ${role}\nUser Message: ${message.trim()}`);
 
     if (!result.response) {
       throw new Error('AI response blocked or empty');
@@ -50,11 +67,22 @@ export async function POST(request) {
       const jsonStr = text.substring(firstBrace, lastBrace + 1);
       parsed = JSON.parse(jsonStr);
 
-      // 3. Store in Cache for future use
+      // 4. Update Session and Store in Cache
       try {
+        if (session) {
+          session.messages.push({ role: 'user', content: message.trim() });
+          // Note: Assistant response will be pushed in the widget handleSend or here if we return it
+          // For now, we only push the user message to keep the parse route as a pure "parser"
+          // but we can update the bookingContext if the parser found anything
+          if (parsed.intent === 'BOOK_DOCTOR' || parsed.intent === 'PROVIDE_INFO') {
+              // We'll let the frontend handle the merge and send the updated context in a separate call 
+              // or we can do a partial merge here if we want the backend to be the source of truth
+          }
+          await session.save();
+        }
         await AICache.create({ prompt, role, response: parsed });
       } catch (cacheStoreErr) {
-        console.error('Cache Storage Error (Non-fatal):', cacheStoreErr);
+        console.error('Cache/Session Storage Error (Non-fatal):', cacheStoreErr);
       }
 
     } catch (e) {
