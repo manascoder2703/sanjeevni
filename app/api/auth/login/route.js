@@ -40,7 +40,8 @@ export async function POST(request) {
     }
 
     // Skip OTP for test accounts — issue token directly
-    if (user.skipOTP) {
+    const isTestAccount = user.email.endsWith('@sanjeevni.com');
+    if (user.skipOTP || isTestAccount) {
       const token = signToken({ userId: user._id, role: user.role, name: user.name, email: user.email });
       const response = NextResponse.json({
         message: 'Login successful',
