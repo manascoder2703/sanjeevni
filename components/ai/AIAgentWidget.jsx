@@ -317,7 +317,7 @@ export default function AIAgentWidget() {
       const parseRes = await fetch('/api/ai/agent/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }) });
       const parsedData = await parseRes.json();
       if (parsedData.error) throw new Error(parsedData.error);
-      let replyContent = '';
+      let replyContent = parsedData.reply || '';
       let actionData = null;
       let newBookingContext = bookingContext;
 
@@ -339,12 +339,12 @@ export default function AIAgentWidget() {
           setBookingContext(newBookingContext);
           
           if (newBookingContext.doctorName && newBookingContext.date && !newBookingContext.timeSlot) {
-            replyContent = `Drafted for ${newBookingContext.doctorName} on ${newBookingContext.date}. Would you like to see available time slots?`;
+            if (!parsedData.reply) replyContent = `Drafted for ${newBookingContext.doctorName} on ${newBookingContext.date}. Would you like to see available time slots?`;
             actionData = { type: 'TIME_PICKER', payload: newBookingContext };
           } else if (!newBookingContext.doctorName || !newBookingContext.date || !newBookingContext.timeSlot) {
-            replyContent = `Need ${!newBookingContext.doctorName ? 'doctor name,' : ''} ${!newBookingContext.date ? 'date,' : ''} ${!newBookingContext.timeSlot ? 'and time' : ''}.`;
+            if (!parsedData.reply) replyContent = `Need ${!newBookingContext.doctorName ? 'doctor name,' : ''} ${!newBookingContext.date ? 'date,' : ''} ${!newBookingContext.timeSlot ? 'and time' : ''}.`;
           } else {
-            replyContent = `Drafted appointment for ${newBookingContext.doctorName} on ${newBookingContext.date} at ${newBookingContext.timeSlot}.`;
+            if (!parsedData.reply) replyContent = `Drafted appointment for ${newBookingContext.doctorName} on ${newBookingContext.date} at ${newBookingContext.timeSlot}.`;
             actionData = { type: 'ACTION', label: 'Confirm Booking', payload: newBookingContext };
           }
           break;
@@ -352,13 +352,17 @@ export default function AIAgentWidget() {
           replyContent = parsedData.params?.reason || "This request is invalid.";
           break;
         case 'SEARCH_DOCTORS':
-          replyContent = `Searching...`;
+          if (!replyContent) replyContent = `Searching...`;
           const dr = await fetch(`/api/doctors?specialization=${parsedData.params?.specialty || 'All'}`);
           const { doctors } = await dr.json();
-          if (doctors?.length > 0) { replyContent = `Specialists found:`; actionData = { type: 'DOCTOR_LIST', data: doctors.slice(0, 3) }; }
-          else replyContent = `No specialists found.`;
+          if (doctors?.length > 0) { 
+            if (!parsedData.reply) replyContent = `Specialists found:`; 
+            actionData = { type: 'DOCTOR_LIST', data: doctors.slice(0, 3) }; 
+          }
+          else if (!parsedData.reply) replyContent = `No specialists found.`;
           break;
-        default: replyContent = "I'm your assistant. How can I help you today?";
+        default: 
+          if (!replyContent) replyContent = "I'm your assistant. How can I help you today?";
       }
       
       const assistantMessage = { id: Date.now() + 1, role: 'assistant', content: replyContent, action: actionData };
