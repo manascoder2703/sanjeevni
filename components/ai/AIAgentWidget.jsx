@@ -2,7 +2,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, Plus, Mic, Activity } from 'lucide-react';
+import {
+  X,
+  Clock,
+  Sparkles,
+  Search,
+  Check,
+  ChevronDown,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAgent } from '@/context/AgentContext';
 import Orb from '../ui/Orb';
@@ -155,7 +162,9 @@ export default function AIAgentWidget() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ doctorId, date: details.date, timeSlot: details.timeSlot })
       });
-      if (!bookRes.ok) throw new Error("Booking failed");
+      const bookData = await bookRes.json();
+      if (!bookRes.ok) throw new Error(bookData.error || "Booking failed");
+
       toast.success("Confirmed!", { id: tId });
       setMessages(prev => [...prev, { id: Date.now(), role: 'assistant', content: `Confirmed: Dr. ${details.doctorName} on ${details.date} at ${details.timeSlot}.` }]);
       setBookingContext(null);
@@ -176,9 +185,86 @@ export default function AIAgentWidget() {
     fetchSession();
   }, []);
 
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, loading, isOpen]);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [fetchingSlots, setFetchingSlots] = useState(false);
+  const [activeSlotPickerId, setActiveSlotPickerId] = useState(null);
+
+  const fetchAvailableSlots = async (doctorName, date) => {
+    setFetchingSlots(true);
+    try {
+      const cleanName = doctorName.replace(/^(dr\.?|doctor|mr\.?|ms\.?|mrs\.?)\s+/i, '').trim();
+      const searchRes = await fetch(`/api/doctors?search=${encodeURIComponent(cleanName)}`);
+      const { doctors } = await searchRes.json();
+      if (!doctors || doctors.length === 0) throw new Error("Doctor not found");
+      
+      const docId = doctors[0]._id;
+      const res = await fetch(`/api/doctors/${docId}?date=${encodeURIComponent(date)}`);
+      const data = await res.json();
+      
+      // Filter slots that are actually available
+      const allSlots = Object.keys(data.slotStates || {}).length > 0 
+        ? Object.keys(data.slotStates) 
+        : []; // This is tricky, we need a list of ALL possible slots to filter
+      
+      // Let's use a simpler approach: get all slots from DEFAULT_TIME_WINDOWS logic
+      // Actually, let's just use the ones that are NOT booked/locked
+      const slotStates = data.slotStates || {};
+      const now = new Date();
+      const isToday = date === now.toISOString().split('T')[0];
+      
+      // Hardcoded list of common slots for the picker (can be expanded)
+      const commonSlots = ["09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "01:10 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"];
+      
+      const available = commonSlots.filter(slot => {
+        const state = slotStates[slot] || 'available';
+        if (state !== 'available') return false;
+        if (isToday) {
+            // Check if slot is in the future (simple hour check)
+            const [time, meridiem] = slot.split(' ');
+            let [h, m] = time.split(':').map(Number);
+            if (meridiem === 'PM' && h !== 12) h += 12;
+            if (meridiem === 'AM' && h === 12) h = 0;
+            const slotDate = new Date(date);
+            slotDate.setHours(h, m, 0);
+            return slotDate > now;
+        }
+        return true;
+      });
+      
+      setAvailableSlots(available);
+    } catch (err) {
+      toast.error("Failed to load slots");
+    } finally {
+      setFetchingSlots(false);
+    }
+  };
+
+  const handleSlotSelect = (slot, context, msgId) => {
+    const updated = { ...context, timeSlot: slot };
+    setBookingContext(updated);
+    setActiveSlotPickerId(null);
+    
+    // Auto-reply as if user chose it
+    const assistantReply = `Great choice. I've updated the time to ${slot}. Ready to confirm?`;
+    const assistantMessage = { 
+      id: Date.now() + 50, 
+      role: 'assistant', 
+      content: assistantReply, 
+      action: { type: 'ACTION', label: 'Confirm Booking', payload: updated } 
+    };
+    
+    setMessages(prev => [...prev, assistantMessage]);
+    
+    // Sync session
+    fetch('/api/ai/agent/session/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          messages: [...messages, assistantMessage],
+          bookingContext: updated
+        })
+    }).catch(e => console.error("Sync error:", e));
+  };
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : 'unset';
@@ -216,12 +302,19 @@ export default function AIAgentWidget() {
         case 'PROVIDE_INFO':
           newBookingContext = mergeBookingParams(bookingContext, parsedData.params);
           setBookingContext(newBookingContext);
-          if (!newBookingContext.doctorName || !newBookingContext.date || !newBookingContext.timeSlot) {
+          
+          if (newBookingContext.doctorName && newBookingContext.date && !newBookingContext.timeSlot) {
+            replyContent = `Drafted for ${newBookingContext.doctorName} on ${newBookingContext.date}. Would you like to see available time slots?`;
+            actionData = { type: 'TIME_PICKER', payload: newBookingContext };
+          } else if (!newBookingContext.doctorName || !newBookingContext.date || !newBookingContext.timeSlot) {
             replyContent = `Need ${!newBookingContext.doctorName ? 'doctor name,' : ''} ${!newBookingContext.date ? 'date,' : ''} ${!newBookingContext.timeSlot ? 'and time' : ''}.`;
           } else {
             replyContent = `Drafted appointment for ${newBookingContext.doctorName} on ${newBookingContext.date} at ${newBookingContext.timeSlot}.`;
             actionData = { type: 'ACTION', label: 'Confirm Booking', payload: newBookingContext };
           }
+          break;
+        case 'INVALID_REQUEST':
+          replyContent = parsedData.params?.reason || "This request is invalid.";
           break;
         case 'SEARCH_DOCTORS':
           replyContent = `Searching...`;
@@ -293,8 +386,8 @@ export default function AIAgentWidget() {
             {/* RESULTS */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center relative z-10" style={{ padding: '120px 40px 300px 40px' }}>
               <div className="w-full max-w-[800px] mx-auto flex flex-col">
-                {messages.map((m) => (
-                  <div key={m.id} className="w-full mb-16! animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                {messages.map((m, idx) => (
+                  <div key={m._id || m.id || idx} className="w-full mb-16! animate-in fade-in slide-in-from-bottom-8 duration-1000">
                     {m.role === 'user' ? (
                       <div className="flex justify-end mb-10!">
                         <div className="text-sky-100/40 text-4xl font-medium tracking-tight text-right max-w-[90%] drop-shadow-[0_0_30px_rgba(186,242,248,0.2)] leading-relaxed">
@@ -333,16 +426,50 @@ export default function AIAgentWidget() {
                                 </ul>
                               </div>
                             )}
-                            {m.action.type === 'ACTION' && (
-                              <div className="pt-16 border-t border-white/5">
-                                <button 
-                                  disabled={executing} 
-                                  onClick={() => confirmBooking(m.action.payload)} 
-                                  className="px-20 h-24 bg-white/5 border border-white/10 hover:border-white/20 text-white/90 font-black text-2xl rounded-[36px] flex items-center gap-6 transition-all transform active:scale-95 hover:bg-white/10"
-                                >
-                                  <Sparkles size={32} className="text-sky-400" />
-                                  {executing ? 'Executing...' : m.action.label}
-                                </button>
+                            {m.action.type === 'TIME_PICKER' && (
+                              <div className="pt-12 border-t border-white/5">
+                                <div className="relative">
+                                  <button 
+                                    onClick={() => {
+                                      if (activeSlotPickerId === m.id) setActiveSlotPickerId(null);
+                                      else {
+                                        setActiveSlotPickerId(m.id);
+                                        fetchAvailableSlots(m.action.payload.doctorName, m.action.payload.date);
+                                      }
+                                    }}
+                                    className="px-10 h-16 bg-white/5 border border-white/10 hover:border-white/20 text-white/70 font-bold text-lg rounded-2xl flex items-center gap-4 transition-all hover:bg-white/10"
+                                  >
+                                    <Clock size={20} className="text-sky-400" />
+                                    {fetchingSlots ? 'Fetching Slots...' : 'View Available Time Slots'}
+                                    <ChevronDown size={18} className={`transition-transform duration-300 ${activeSlotPickerId === m.id ? 'rotate-180' : ''}`} />
+                                  </button>
+                                  
+                                  {activeSlotPickerId === m.id && availableSlots.length > 0 && (
+                                    <motion.div 
+                                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                                      className="absolute left-0 top-full mt-4 w-72 max-h-80 overflow-y-auto bg-zinc-900/95 backdrop-blur-3xl border border-white/10 rounded-2xl p-4 z-[300] shadow-[0_20px_50px_rgba(0,0,0,0.5)] custom-scrollbar"
+                                    >
+                                      <div className="grid grid-cols-1 gap-2">
+                                        {availableSlots.map((slot) => (
+                                          <button 
+                                            key={slot}
+                                            onClick={() => handleSlotSelect(slot, m.action.payload, m.id)}
+                                            className="w-full px-6 py-4 text-left text-white/60 hover:text-white hover:bg-white/5 rounded-xl transition-all font-medium border border-transparent hover:border-white/5"
+                                          >
+                                            {slot}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                  
+                                  {activeSlotPickerId === m.id && !fetchingSlots && availableSlots.length === 0 && (
+                                    <div className="absolute left-0 top-full mt-4 w-72 p-6 bg-zinc-900/95 backdrop-blur-3xl border border-white/10 rounded-2xl text-white/30 text-sm font-medium">
+                                      No slots available for this date.
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
