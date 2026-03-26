@@ -9,6 +9,10 @@ import {
   Search,
   Check,
   ChevronDown,
+  Activity,
+  Send,
+  Plus,
+  Mic
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAgent } from '@/context/AgentContext';
