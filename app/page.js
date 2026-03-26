@@ -18,6 +18,7 @@ import GradualBlur from '@/components/react-bits/GradualBlur';
 import GradientText from '@/components/react-bits/GradientText';
 import GlassSurface from '@/components/react-bits/GlassSurface';
 import LandingAssistantWidget from '@/components/LandingAssistantWidget';
+import ProfileCard from '@/components/ProfileCard';
 
 function TestimonialCarousel({ title, subtitle, testimonials, gradientColors, accentColor, sectionStyle, roleFallback }) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -662,111 +663,30 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="relative">
-                <div className="w-full max-w-[500px] lg:max-w-[560px] mx-auto relative">
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: '30px auto auto 10%',
-                      width: 220,
-                      height: 220,
-                      borderRadius: '50%',
-                      background: 'rgba(34,211,238,0.16)',
-                      filter: 'blur(80px)',
-                      pointerEvents: 'none'
-                    }}
+              <div className="relative flex justify-center items-center">
+                <div 
+                  style={{
+                    position: 'absolute',
+                    inset: '30px auto auto 10%',
+                    width: '300px',
+                    height: '300px',
+                    borderRadius: '50%',
+                    background: 'rgba(34,211,238,0.2)',
+                    filter: 'blur(100px)',
+                    pointerEvents: 'none',
+                    zIndex: 0
+                  }}
+                />
+                <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '420px' }}>
+                  <ProfileCard
+                    name="Manas Mishra"
+                    title="Founder, Sanjeevni"
+                    handle="manas"
+                    avatarUrl="/profile.png"
+                    enableTilt={true}
+                    behindGlowColor="rgba(34, 211, 238, 0.4)"
+                    innerGradient="linear-gradient(145deg, #050b18 0%, #1e3a8a 100%)"
                   />
-                  <div
-                    style={{
-                      position: 'relative',
-                      borderRadius: 34,
-                      overflow: 'hidden',
-                      minHeight: 560,
-                      background: 'linear-gradient(180deg, rgba(11,15,25,0.96), rgba(7,10,18,0.98))',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      boxShadow: '0 24px 80px rgba(0,0,0,0.42)'
-                    }}
-                  >
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: '-10% auto auto -8%',
-                        width: 220,
-                        height: 220,
-                        borderRadius: '50%',
-                        background: 'rgba(34,211,238,0.14)',
-                        filter: 'blur(72px)',
-                        pointerEvents: 'none',
-                        zIndex: 1
-                      }}
-                    />
-                    {!founderImageMissing ? (
-                      <>
-                        <img
-                          src="/founder-manas-mishra.jpg.png"
-                          alt="Manas Mishra"
-                          onError={() => setFounderImageMissing(true)}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            objectPosition: 'center 14%',
-                            minHeight: 560,
-                            filter: 'brightness(0.94) saturate(0.92) contrast(1.04)'
-                          }}
-                        />
-                        <div
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            background: 'linear-gradient(180deg, rgba(5,8,15,0.14) 0%, rgba(5,8,15,0.04) 30%, rgba(5,8,15,0.22) 62%, rgba(5,8,15,0.72) 100%), linear-gradient(90deg, rgba(5,8,15,0.38) 0%, rgba(5,8,15,0.08) 28%, rgba(5,8,15,0) 52%, rgba(5,8,15,0.18) 100%)',
-                            pointerEvents: 'none',
-                            zIndex: 2
-                          }}
-                        />
-                        <div
-                          style={{
-                            position: 'absolute',
-                            inset: 'auto 0 0 0',
-                            height: 120,
-                            background: 'linear-gradient(180deg, rgba(5,8,15,0), rgba(5,8,15,0.86))',
-                            pointerEvents: 'none',
-                            zIndex: 2
-                          }}
-                        />
-                      </>
-                    ) : (
-                      <div
-                        style={{
-                          width: '100%',
-                          minHeight: 560,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: 'linear-gradient(135deg, rgba(34,211,238,0.16), rgba(129,140,248,0.12))'
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 150,
-                            height: 150,
-                            borderRadius: '50%',
-                            background: 'rgba(255,255,255,0.08)',
-                            border: '1px solid rgba(255,255,255,0.14)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'white',
-                            fontSize: 48,
-                            fontWeight: 900,
-                            letterSpacing: '-0.04em'
-                          }}
-                        >
-                          MM
-                        </div>
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
             </div>
