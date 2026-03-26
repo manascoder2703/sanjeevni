@@ -9,10 +9,11 @@ import {
   Search,
   Check,
   ChevronDown,
-  Activity,
-  Send,
   Plus,
-  Mic
+  Mic,
+  Trash2,
+  Activity,
+  Send
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAgent } from '@/context/AgentContext';
@@ -170,8 +171,19 @@ export default function AIAgentWidget() {
       if (!bookRes.ok) throw new Error(bookData.error || "Booking failed");
 
       toast.success("Confirmed!", { id: tId });
-      setMessages(prev => [...prev, { id: Date.now(), role: 'assistant', content: `Confirmed: Dr. ${details.doctorName} on ${details.date} at ${details.timeSlot}.` }]);
+      const finalMsg = { id: Date.now(), role: 'assistant', content: `Confirmed: Dr. ${details.doctorName} on ${details.date} at ${details.timeSlot}.` };
+      setMessages(prev => [...prev, finalMsg]);
       setBookingContext(null);
+      
+      // Sync cleared context to session
+      fetch('/api/ai/agent/session/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          messages: [...messages, finalMsg],
+          bookingContext: null
+        })
+      }).catch(e => console.error("Sync error:", e));
     } catch (err) { toast.error(err.message, { id: tId }); } finally { setExecuting(false); }
   };
 
@@ -284,6 +296,14 @@ export default function AIAgentWidget() {
     return updated;
   };
 
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
+
+  const clearConversation = () => {
+    setMessages([]);
+    setShowPlusMenu(false);
+    toast.success("Chat screen cleared");
+  };
+
   const handleSend = async (e) => {
     e?.preventDefault();
     if (isListening) { if (recognitionRef.current) recognitionRef.current.stop(); stopAudioAnalysis(); setIsListening(false); }
@@ -301,10 +321,21 @@ export default function AIAgentWidget() {
       let actionData = null;
       let newBookingContext = bookingContext;
 
+      // Handle explicit reset keywords
+      const lowerText = text.toLowerCase();
+      const isResetRequest = lowerText.includes('new appointment') || 
+                            lowerText.includes('start over') || 
+                            lowerText.includes('book another') ||
+                            parsedData.params?.resetContext === true;
+
+      if (isResetRequest) {
+        newBookingContext = null;
+      }
+
       switch (parsedData.intent) {
         case 'BOOK_DOCTOR':
         case 'PROVIDE_INFO':
-          newBookingContext = mergeBookingParams(bookingContext, parsedData.params);
+          newBookingContext = mergeBookingParams(newBookingContext, parsedData.params);
           setBookingContext(newBookingContext);
           
           if (newBookingContext.doctorName && newBookingContext.date && !newBookingContext.timeSlot) {
@@ -511,7 +542,39 @@ export default function AIAgentWidget() {
                   style={{ padding: '16px 24px' }}
                 >
                   <div className="flex items-center gap-4">
-                    <button type="button" className="size-12 bg-white/5 flex items-center justify-center rounded-full text-white/30 hover:text-white transition-all transform hover:scale-110 active:scale-95"><Plus size={28} /></button>
+                    <div className="relative">
+                      <button 
+                        type="button" 
+                        onClick={() => setShowPlusMenu(!showPlusMenu)}
+                        className={`size-12 flex items-center justify-center rounded-full transition-all transform hover:scale-110 active:scale-95 ${showPlusMenu ? 'bg-white/20 text-white rotate-45' : 'bg-white/5 text-white/30 hover:text-white'}`}
+                      >
+                        <Plus size={28} />
+                      </button>
+
+                      <AnimatePresence>
+                        {showPlusMenu && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            className="absolute bottom-full left-0 mb-4 w-80! bg-zinc-900/95 backdrop-blur-3xl border border-white/10 rounded-2xl p-3! z-[300] shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+                          >
+                            <button 
+                              onClick={clearConversation}
+                              className="w-full flex items-center gap-5 px-6! py-5! text-left text-white/60 hover:text-white hover:bg-white/5 rounded-xl transition-all font-medium group"
+                            >
+                              <div className="size-12 bg-white/5 rounded-full flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                                <Trash2 size={24} className="text-white/40 group-hover:text-red-400/80 transition-colors" />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-xl font-bold tracking-tight">Clear Conversation</span>
+                                <span className="text-xs text-white/20 font-medium">Removes messages from current screen</span>
+                              </div>
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                     <textarea 
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
