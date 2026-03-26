@@ -87,7 +87,7 @@ function SymptomChecker() {
         <motion.button
           onClick={analyze}
           disabled={loading}
-          whileHover={!loading ? { scale: 1.02, backgroundColor: '#ffffff', color: '#0f172a', boxShadow: '0 0 30px rgba(255,255,255,0.2)' } : {}}
+          whileHover={!loading ? { scale: 1.02, backgroundColor: '#ffffff', color: '#0f172a', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' } : {}}
           whileTap={!loading ? { scale: 0.98 } : {}}
           style={{ 
             marginTop: 18, 
@@ -441,7 +441,7 @@ function HealthChat({ messages, setMessages, chatId, setChatId, loading, setLoad
             }}
           />
           <motion.button
-            whileHover={!(loading || countdown > 0 || !input.trim()) ? { scale: 1.05, backgroundColor: '#ffffff', color: '#0f172a', boxShadow: '0 0 20px rgba(255, 255, 255, 0.2)' } : {}}
+            whileHover={!(loading || countdown > 0 || !input.trim()) ? { scale: 1.05, backgroundColor: '#ffffff', color: '#0f172a', boxShadow: '0 8px 20px rgba(0,0,0,0.15)' } : {}}
             whileTap={!(loading || countdown > 0 || !input.trim()) ? { scale: 0.95 } : {}}
             onClick={sendMessage}
             disabled={loading || countdown > 0 || (!input.trim() && countdown === 0)}
@@ -729,7 +729,7 @@ export default function AIAssistantPage() {
         .symptom-textarea:focus {
           border-color: rgba(255, 255, 255, 0.5) !important;
           background: rgba(0, 0, 0, 0.5) !important;
-          box-shadow: 0 0 30px rgba(255, 255, 255, 0.15);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
         
         .premium-card:focus-within {
@@ -757,7 +757,7 @@ export default function AIAssistantPage() {
         .chat-input-container:focus-within {
           border-color: rgba(255, 255, 255, 0.2) !important;
           background: rgba(255, 255, 255, 0.05) !important;
-          box-shadow: 0 0 30px rgba(255, 255, 255, 0.05) !important;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4) !important;
         }
 
         /* Custom Scrollbar for Chat */

@@ -104,10 +104,10 @@ body::before {
 
 .obsidian-card:hover {
   background: rgba(255, 255, 255, 0.05) !important;
-  transform: translateY(-8px) scale(1.02);
+  transform: translateY(-6px);
   border-color: rgba(255, 255, 255, 0.45) !important;
   box-shadow: 
-    0 0 30px rgba(255, 255, 255, 0.15),
+    0 10px 20px -5px rgba(0, 0, 0, 0.3),
     0 45px 80px -20px rgba(0, 0, 0, 0.6) !important;
 }
 
@@ -122,8 +122,9 @@ body::before {
 .neon-glass-card:hover {
   background: rgba(255, 255, 255, 0.03);
   box-shadow: 
+    0 10px 20px -5px rgba(0, 0, 0, 0.3),
     0 45px 80px -20px rgba(0, 0, 0, 0.6);
-  transform: translateY(-4px) scale(1.01);
+  transform: translateY(-6px);
 }
 
 /* Soft Neon Background Glows */

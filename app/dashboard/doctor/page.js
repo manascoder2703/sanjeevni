@@ -79,7 +79,7 @@ function TodayRow({ apt, onAccept, onReject, onDone, onSummary }) {
   const { label, color, bg: sBg, border: sBorder, dot } = getStatusStyle(apt.status);
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 20px', background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.06)', borderRadius: '14px', transition: 'background 0.15s' }}
+    <div className="neon-glass-card obsidian-card" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 20px', borderRadius: '14px', transition: 'background 0.15s' }}
       onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
       onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
     >
@@ -438,7 +438,7 @@ export default function DoctorDashboard() {
     { id: 'cancelled', label: 'Cancelled', count: cancelledApts.length },
   ];
 
-  const card = { background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.07)', borderRadius: '20px' };
+  const card = { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '20px' };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', width: '100%', paddingBottom: '80px' }}>
@@ -489,7 +489,7 @@ export default function DoctorDashboard() {
           { label: 'Completed', value: completedApts.length, iconColor: '#4ade80', iconBg: 'rgba(34,197,94,0.12)',   Icon: CheckCircle },
           { label: 'Total',     value: total,                iconColor: '#a78bfa', iconBg: 'rgba(139,92,246,0.12)',  Icon: Users },
         ].map(stat => (
-          <div key={stat.label} style={{ ...card, padding: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div key={stat.label} className="neon-glass-card obsidian-card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '14px', borderRadius: '20px' }}>
             <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: stat.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <stat.Icon size={18} style={{ color: stat.iconColor }} />
             </div>
@@ -505,7 +505,7 @@ export default function DoctorDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px' }}>
 
         {/* Today's Schedule */}
-        <div style={{ ...card, padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="neon-glass-card obsidian-card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px', borderRadius: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(59,130,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -542,7 +542,7 @@ export default function DoctorDashboard() {
         </div>
 
         {/* Performance */}
-        <div style={{ ...card, padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="neon-glass-card obsidian-card" style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px', borderRadius: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Activity size={15} style={{ color: '#fbbf24' }} />
@@ -620,7 +620,7 @@ export default function DoctorDashboard() {
         </div>
 
         {/* Table */}
-        <div style={{ ...card, overflow: 'hidden' }}>
+        <div className="neon-glass-card obsidian-card" style={{ overflow: 'hidden', borderRadius: '20px' }}>
           {/* Header */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1.5fr', gap: '16px', padding: '12px 28px', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
             {['Patient', 'Date', 'Time', 'Status', 'Action'].map((h, i) => (
@@ -709,7 +709,7 @@ export default function DoctorDashboard() {
                 <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>Patient: {summaryApt.patientId?.name}</p>
               </div>
             </div>
-            <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '16px', padding: '24px', border: '0.5px solid rgba(255,255,255,0.06)', minHeight: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="neon-glass-card obsidian-card" style={{ borderRadius: '16px', padding: '24px', minHeight: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {summaryLoading ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                   <Loader2 size={32} className="animate-spin" style={{ color: '#a78bfa' }} />
@@ -765,7 +765,7 @@ function PlanTrigger({ onClick, isPlanned }) {
           display: 'flex', alignItems: 'center', gap: 10, padding: '14px 22px', 
           borderRadius: 20, border: '1px solid rgba(255,255,255,0.2)', 
           background: 'linear-gradient(135deg, #e5e7eb, #9ca3af, #e5e7eb)', color: '#000', 
-          fontWeight: 900, boxShadow: '0 0 30px rgba(192,192,192,0.4)',
+          fontWeight: 900, boxShadow: '0 8px 20px rgba(0,0,0,0.2)',
           cursor: 'default', outline: 'none'
         }}
       >

@@ -479,10 +479,10 @@ export default function DoctorProfilePage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: '32px', alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '28px', padding: '40px' }}>
+            <div className="neon-glass-card obsidian-card" style={{ padding: '40px', borderRadius: '28px' }}>
               <div style={{ display: 'flex', gap: '32px' }}>
                 <div style={{ position: 'relative' }}>
-                  <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'linear-gradient(135deg, #3b82f6, #60a5fa)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: '800', color: '#fff', boxShadow: '0 0 30px rgba(59,130,246,0.3)' }}>
+                  <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'linear-gradient(135deg, #3b82f6, #60a5fa)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: '800', color: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.3)' }}>
                     {initials}
                   </div>
                   <div style={{ position: 'absolute', bottom: '4px', right: '4px', width: '14px', height: '14px', borderRadius: '50%', background: isOnline ? '#4ade80' : 'rgba(255,255,255,0.2)', border: '3px solid #050608' }} />
@@ -529,13 +529,13 @@ export default function DoctorProfilePage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', position: 'sticky', top: '32px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '28px', padding: '32px', textAlign: 'center' }}>
+            <div className="neon-glass-card obsidian-card" style={{ padding: '32px', textAlign: 'center', borderRadius: '28px' }}>
               <p style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.35)', marginBottom: '8px' }}>Consultation Fee</p>
               <h2 style={{ fontSize: '42px', fontWeight: '900', margin: 0, letterSpacing: '-1px', color: '#fff' }}>Rs {doctor.fee}</h2>
               <p style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.25)', marginTop: '4px' }}>Secure Payment & Instant Access</p>
             </div>
 
-            <div style={{ background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '28px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div className="neon-glass-card obsidian-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px', borderRadius: '28px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '4px' }}>
                   <Calendar size={14} style={{ color: '#fff', filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }} />

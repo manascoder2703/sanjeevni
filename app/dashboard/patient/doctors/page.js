@@ -148,7 +148,7 @@ export default function FindDoctors() {
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center' }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 14px', borderRadius: '99px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.14em', color: 'rgba(255,255,255,0.3)' }}>
-          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22d3ee', display: 'inline-block', boxShadow: '0 0 10px rgba(34,211,238,0.5)' }} />
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22d3ee', display: 'inline-block' }} />
           Medical Directory
         </span>
         <h1 style={{ fontSize: '44px', fontWeight: '900', color: '#fff', letterSpacing: '-1.5px', margin: 0, textShadow: '0 0 20px rgba(59,130,246,0.3)' }}>
@@ -180,7 +180,7 @@ export default function FindDoctors() {
           )}
         </div>
         <button onClick={() => setShowFilters(v => !v)}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderRadius: '14px', border: `1px solid ${hasActiveFilters ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.2)'}`, background: hasActiveFilters ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)', color: hasActiveFilters ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '800', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s', boxShadow: hasActiveFilters ? '0 0 20px rgba(255,255,255,0.05)' : 'none' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 20px', borderRadius: '14px', border: `1px solid ${hasActiveFilters ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.2)'}`, background: hasActiveFilters ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)', color: hasActiveFilters ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '13px', fontWeight: '800', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
           <SlidersHorizontal size={14} />
           Filters {hasActiveFilters && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22d3ee', display: 'inline-block', boxShadow: '0 0 10px rgba(34,211,238,0.6)' }} />}
         </button>
@@ -227,7 +227,7 @@ export default function FindDoctors() {
               <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: '3px 0 0' }}>Show only doctors currently online</p>
             </div>
             <button onClick={() => setOnlineOnly(v => !v)}
-              style={{ width: '44px', height: '24px', borderRadius: '99px', background: onlineOnly ? '#22d3ee' : 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0, boxShadow: onlineOnly ? '0 0 15px rgba(34,211,238,0.4)' : 'none' }}>
+              style={{ width: '44px', height: '24px', borderRadius: '99px', background: onlineOnly ? '#22d3ee' : 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
               <span style={{ position: 'absolute', top: '3px', left: onlineOnly ? '22px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
@@ -251,7 +251,7 @@ export default function FindDoctors() {
             { label: 'Online Now',    value: onlineCount, highlight: onlineCount > 0 },
             { label: 'Avg Rating',    value: avgRating },
           ].map(stat => (
-            <div key={stat.label} className="neon-glass-card obsidian-card" style={{ border: `1px solid ${stat.highlight ? 'rgba(34,197,94,0.4)' : 'rgba(255,255,255,0.2)'}`, borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
+            <div key={stat.label} className="neon-glass-card obsidian-card" style={{ borderRadius: '16px', padding: '20px', textAlign: 'center' }}>
               <div style={{ fontSize: '28px', fontWeight: '800', color: stat.highlight ? '#4ade80' : '#fff', letterSpacing: '-0.5px' }}>{stat.value}</div>
               <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: '600', marginTop: '4px' }}>{stat.label}</div>
             </div>

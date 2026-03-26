@@ -189,7 +189,7 @@ export default function PatientDashboard() {
           { label: 'Doctors Visited',     value: doctorsVisited,    icon: Users,        iconColor: '#8b5cf6',  iconBg: 'rgba(139,92,246,0.2)' },
           { label: 'BMI Score',           value: bmiValue,          icon: Activity,     iconColor: '#f59e0b',  iconBg: 'rgba(245,158,11,0.2)' },
         ].map(stat => (
-          <div key={stat.label} className="neon-glass-card obsidian-card" style={{ padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: '24px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
+          <div key={stat.label} className="neon-glass-card obsidian-card" style={{ padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: stat.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <stat.icon size={22} style={{ color: stat.iconColor }} />
             </div>
@@ -205,7 +205,7 @@ export default function PatientDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
 
         {/* Today */}
-        <div className="neon-glass-card obsidian-card" style={{ padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: '24px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
+        <div className="neon-glass-card obsidian-card" style={{ padding: '32px 40px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -294,7 +294,7 @@ export default function PatientDashboard() {
               const docName = appt.doctorId?.userId?.name || 'Doctor';
               const { label, color, bg, border, dot } = getStatusConfig(appt.status);
               return (
-                <div key={appt._id} className="neon-glass-card obsidian-card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
+                <div key={appt._id} className="neon-glass-card obsidian-card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <span style={{ fontSize: '12px', fontWeight: '700', color: '#a78bfa' }}>{getInitials(docName)}</span>
@@ -352,7 +352,7 @@ export default function PatientDashboard() {
         </div>
 
         {/* Table */}
-        <div className="neon-glass-card obsidian-card" style={{ overflow: 'hidden', border: '1px solid rgba(255, 255, 255, 0.2)' }}>
+        <div className="neon-glass-card obsidian-card" style={{ overflow: 'hidden' }}>
           {/* Header */}
           <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1.2fr 1.4fr 1fr 1.4fr 1.2fr', gap: '16px', padding: '14px 32px', borderBottom: '0.5px solid rgba(255,255,255,0.05)', background: 'transparent' }}>
             {['Doctor', 'Specialty', 'Date', 'Time', 'Status', 'Action'].map((h, i) => (

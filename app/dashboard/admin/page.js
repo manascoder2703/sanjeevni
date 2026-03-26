@@ -42,13 +42,13 @@ function getStatusStyle(status) {
   }
 }
 
-const card = { background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.07)', borderRadius: '20px' };
+const card = { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '20px' };
 
 function inp(extra = {}) {
   return {
     style: {
       width: '100%', background: 'rgba(255,255,255,0.03)',
-      border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '10px',
+      border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px',
       padding: '10px 14px', fontSize: '13px', color: '#fff', outline: 'none',
       boxSizing: 'border-box', transition: 'border-color 0.15s', ...extra,
     },
@@ -133,7 +133,7 @@ function EditDoctorModal({ doctor, onClose, onSave }) {
         </div>
 
         <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
-          <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.04)', border: '0.5px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
             Cancel
           </button>
           <button onClick={handleSave} disabled={saving}
@@ -247,7 +247,7 @@ export default function AdminDashboard() {
           { label: 'Appointments',       value: stats?.totalAppointments || 0, iconColor: '#a78bfa', iconBg: 'rgba(139,92,246,0.12)',  Icon: Calendar },
           { label: 'Pending Approvals',  value: stats?.pendingDoctors || 0,    iconColor: '#fbbf24', iconBg: 'rgba(245,158,11,0.12)', Icon: Clock, highlight: true },
         ].map(s => (
-          <div key={s.label} style={{ ...card, padding: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div key={s.label} className="neon-glass-card obsidian-card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '14px', borderRadius: '20px' }}>
             <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: s.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <s.Icon size={18} style={{ color: s.iconColor }} />
             </div>
@@ -278,7 +278,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Table */}
-      <div style={{ ...card, overflow: 'hidden' }}>
+      <div className="neon-glass-card obsidian-card" style={{ overflow: 'hidden', borderRadius: '20px' }}>
 
         {/* ── Pending Approvals ── */}
         {activeTab === 'pending' && (

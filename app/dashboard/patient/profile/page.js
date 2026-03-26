@@ -26,7 +26,7 @@ function inp(extra = {}) {
   };
 }
 
-const card = { background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.07)', borderRadius: '20px' };
+const card = { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '20px' };
 
 function Label({ children }) {
   return <label style={{ fontSize: '11px', fontWeight: '600', color: 'rgba(255,255,255,0.3)', display: 'block', marginBottom: '7px' }}>{children}</label>;
@@ -137,7 +137,7 @@ export default function PatientProfile() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
           {/* Avatar + Summary Card */}
-          <div style={{ ...card, padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', textAlign: 'center' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', textAlign: 'center' }}>
 
             {/* Avatar */}
             <div style={{ position: 'relative' }}>
@@ -192,7 +192,7 @@ export default function PatientProfile() {
           </div>
 
           {/* Blood Group Picker */}
-          <div style={{ ...card, padding: '20px 22px' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding: '20px 22px' }}>
             <SectionHeader icon={Activity} title="Blood Group" color="#f87171" bg="rgba(239,68,68,0.1)" />
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
               {BLOOD_GROUPS.map(g => {
@@ -221,7 +221,7 @@ export default function PatientProfile() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
           {/* Personal Info */}
-          <div style={{ ...card, padding: '24px 28px' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding: '24px 28px', borderRadius: '20px' }}>
             <SectionHeader icon={User} title="Personal Info" color="#60a5fa" bg="rgba(59,130,246,0.1)" />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
@@ -258,7 +258,7 @@ export default function PatientProfile() {
           </div>
 
           {/* Medical Info */}
-          <div style={{ ...card, padding: '24px 28px' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding: '24px 28px', borderRadius: '20px' }}>
             <SectionHeader icon={Activity} title="Medical Info" color="#fbbf24" bg="rgba(245,158,11,0.1)" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>

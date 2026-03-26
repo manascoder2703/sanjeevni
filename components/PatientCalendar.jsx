@@ -38,7 +38,6 @@ export default function PatientCalendar({ appointments = [] }) {
       display: 'flex', 
       flexDirection: 'column', 
       gap: '24px', 
-      border: '1px solid rgba(255, 255, 255, 0.2)',
       height: '100%',
       minHeight: '440px'
     }}>

@@ -244,9 +244,8 @@ export default function HealthInfoStepper({ onComplete }) {
         layout
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
+        className="neon-glass-card obsidian-card"
         style={{ 
-          background: 'rgba(255,255,255,0.03)', 
-          border: '1px solid rgba(255,255,255,0.06)', 
           borderRadius: 16, 
           padding: 16,
           display: 'flex',
@@ -362,7 +361,7 @@ export default function HealthInfoStepper({ onComplete }) {
                 ))}
               </div>
 
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 24, padding: 32 }}>
+              <div className="neon-glass-card obsidian-card" style={{ borderRadius: 24, padding: 32 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
                   <div style={{ width: 48, height: 48, borderRadius: 16, background: step.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
                     {step.icon}
@@ -453,7 +452,7 @@ export default function HealthInfoStepper({ onComplete }) {
       </div>
 
       {/* RIGHT: LIVE SUMMARY PANEL */}
-      <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 24, border: '1px solid rgba(255,255,255,0.05)', padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="neon-glass-card obsidian-card" style={{ borderRadius: 24, padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
           <AlertCircle size={14} /> LIVE SUMMARY
         </div>

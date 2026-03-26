@@ -7,7 +7,7 @@ import { FileText, Download } from 'lucide-react';
 const ACCENT = '#18b6a2';
 const card = {
   background: 'rgba(255,255,255,0.02)',
-  border: '0.5px solid rgba(255,255,255,0.07)',
+  border: '1px solid rgba(255,255,255,0.2)',
   borderRadius: 16,
 };
 
@@ -88,7 +88,7 @@ function PrescriptionView({ rx }) {
       </div>
 
       {/* Prescription card */}
-      <div style={{ ...card, overflow: 'hidden' }}>
+      <div className="neon-glass-card obsidian-card" style={{ overflow: 'hidden', borderRadius: 16 }}>
         {/* Header */}
         <div style={{ padding: '18px 22px', borderBottom: '0.5px solid rgba(255,255,255,0.07)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', background: 'rgba(255,255,255,0.015)' }}>
           <div>
@@ -245,7 +245,7 @@ export default function PatientPrescriptionsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 20, alignItems: 'start' }}>
 
         {/* Sidebar */}
-        <div style={{ ...card, overflow: 'hidden' }}>
+        <div className="neon-glass-card obsidian-card" style={{ overflow: 'hidden' }}>
           <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.07)', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             {prescriptions.length} prescription{prescriptions.length !== 1 ? 's' : ''}
           </div>
@@ -277,7 +277,7 @@ export default function PatientPrescriptionsPage() {
 
         {/* Main content */}
         {!selectedRx ? (
-          <div style={{ ...card, padding: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, minHeight: 300 }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12, minHeight: 300 }}>
             <FileText size={32} color="rgba(255,255,255,0.15)" />
             <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>Select a prescription to view</div>
           </div>

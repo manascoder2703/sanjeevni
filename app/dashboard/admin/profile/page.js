@@ -53,7 +53,7 @@ function inp(extra = {}) {
   return {
     style: {
       width: '100%', background: 'rgba(255,255,255,0.03)',
-      border: '0.5px solid rgba(255,255,255,0.08)', borderRadius: '12px',
+      border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px',
       padding: '12px 16px', fontSize: '14px', color: '#fff', outline: 'none',
       boxSizing: 'border-box', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', ...extra,
     },
@@ -70,7 +70,7 @@ function inp(extra = {}) {
   };
 }
 
-const card = { background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.07)', borderRadius: '20px' };
+const card = { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '20px' };
 
 function SectionHeader({ icon: Icon, title, color, bg }) {
   return (
@@ -173,7 +173,7 @@ export default function AdminProfile() {
         <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
 
           {/* Avatar Card */}
-          <div style={{ ...card, padding:'28px 20px', display:'flex', flexDirection:'column', alignItems:'center', gap:'16px' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding:'28px 20px', display:'flex', flexDirection:'column', alignItems:'center', gap:'16px', borderRadius: '20px' }}>
 
             <div style={{ position:'relative' }}>
               <AnimatedAvatar
@@ -230,7 +230,7 @@ export default function AdminProfile() {
           </div>
 
           {/* Admin Info Card */}
-          <div style={{ ...card, padding:'20px 22px' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding:'20px 22px', borderRadius: '20px' }}>
             <SectionHeader icon={ShieldCheck} title="Admin Access" color="#fbbf24" bg="rgba(245,158,11,0.1)" />
             <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -258,7 +258,7 @@ export default function AdminProfile() {
         <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
 
           {/* Account Details */}
-          <div style={{ ...card, padding:'24px 28px' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding:'24px 28px', borderRadius: '20px' }}>
             <SectionHeader icon={User} title="Account Details" color="#60a5fa" bg="rgba(59,130,246,0.1)" />
             <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
               <div>
@@ -277,7 +277,7 @@ export default function AdminProfile() {
           </div>
 
           {/* Security & Access */}
-          <div style={{ ...card, padding:'24px 28px' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding:'24px 28px', borderRadius: '20px' }}>
             <SectionHeader icon={Lock} title="Security & Access" color="#a78bfa" bg="rgba(139,92,246,0.1)" />
             <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
               {[

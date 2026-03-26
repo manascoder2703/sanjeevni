@@ -154,7 +154,7 @@ function inp(extra = {}) {
   };
 }
 
-const card = { background: 'rgba(255,255,255,0.02)', border: '0.5px solid rgba(255,255,255,0.07)', borderRadius: '20px' };
+const card = { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '20px' };
 
 function SectionHeader({ icon: Icon, title, color, bg }) {
   return (
@@ -329,7 +329,7 @@ export default function DoctorProfile() {
         <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
 
           {/* Avatar Card — compact */}
-          <div style={{ ...card, padding:'28px 20px', display:'flex', flexDirection:'column', alignItems:'center', gap:'16px' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding:'28px 20px', display:'flex', flexDirection:'column', alignItems:'center', gap:'16px', borderRadius: '20px' }}>
 
             <div style={{ position:'relative' }}>
               <AnimatedAvatar
@@ -398,7 +398,7 @@ export default function DoctorProfile() {
           </div>
 
           {/* Contact Info */}
-          <div style={{ ...card, padding:'20px 22px' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding:'20px 22px', borderRadius: '20px' }}>
             <SectionHeader icon={User} title="Contact" color="#60a5fa" bg="rgba(59,130,246,0.1)" />
             <div style={{ display:'flex', flexDirection:'column', gap:'12px' }}>
               <div>
@@ -425,7 +425,6 @@ export default function DoctorProfile() {
                           border:`0.5px solid ${active ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.07)'}`, 
                           background: active ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.02)', 
                           color: active ? '#fff' : 'rgba(255,255,255,0.3)', 
-                          boxShadow: active ? '0 0 15px rgba(255,255,255,0.05)' : 'none',
                           cursor:'pointer', transition:'all 0.3s ease' 
                         }}>
                         {g.charAt(0).toUpperCase() + g.slice(1)}
@@ -442,7 +441,7 @@ export default function DoctorProfile() {
         <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
 
           {/* Professional Details */}
-          <div style={{ ...card, padding:'24px 28px' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding:'24px 28px', borderRadius: '20px' }}>
             <SectionHeader icon={Briefcase} title="Professional Details" color="#a78bfa" bg="rgba(139,92,246,0.1)" />
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
 
@@ -458,7 +457,7 @@ export default function DoctorProfile() {
                         color: form.specialization ? '#fff' : 'rgba(255,255,255,0.3)', outline:'none', textAlign:'left', 
                         cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', 
                         boxSizing:'border-box', transition:'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        boxShadow: form.specialization ? '0 0 15px rgba(255,255,255,0.03)' : 'none'
+                        boxShadow: 'none'
                       }}
                       onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'}
                       onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'}
@@ -494,7 +493,6 @@ export default function DoctorProfile() {
                           border:`0.5px solid ${active ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.08)'}`, 
                           background: active ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.02)', 
                           color: active ? '#fff' : 'rgba(255,255,255,0.3)', 
-                          boxShadow: active ? '0 0 15px rgba(255,255,255,0.05)' : 'none',
                           cursor:'pointer', transition:'all 0.3s ease' 
                         }}>
                         {ct}
@@ -544,7 +542,7 @@ export default function DoctorProfile() {
           </div>
 
           {/* Qualifications */}
-          <div style={{ ...card, padding:'24px 28px' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding:'24px 28px', borderRadius: '20px' }}>
             <SectionHeader icon={BookOpen} title="Qualifications" color="#4ade80" bg="rgba(34,197,94,0.1)" />
             <div style={{ display:'flex', gap:'10px', marginBottom:'14px' }}>
               <input {...inp()} value={qualInput}
@@ -574,7 +572,7 @@ export default function DoctorProfile() {
           </div>
 
           {/* Languages */}
-          <div style={{ ...card, padding:'24px 28px' }}>
+          <div className="neon-glass-card obsidian-card" style={{ padding:'24px 28px', borderRadius: '20px' }}>
             <SectionHeader icon={Globe} title="Languages" color="#fbbf24" bg="rgba(245,158,11,0.1)" />
             <div style={{ display:'flex', flexWrap:'wrap', gap:'8px' }}>
               {COMMON_LANGS.map(lang => {
@@ -586,7 +584,6 @@ export default function DoctorProfile() {
                       border:`0.5px solid ${active ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.08)'}`, 
                       background: active ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.02)', 
                       color: active ? '#fff' : 'rgba(255,255,255,0.35)', 
-                      boxShadow: active ? '0 0 12px rgba(255,255,255,0.05)' : 'none',
                       cursor:'pointer', transition:'all 0.3s ease' 
                     }}>
                     {lang}

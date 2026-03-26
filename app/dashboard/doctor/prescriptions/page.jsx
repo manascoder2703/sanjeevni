@@ -9,7 +9,7 @@ import PrescriptionModal from '@/components/PrescriptionModal';
 const ACCENT = '#18b6a2';
 const card = {
   background: 'rgba(255,255,255,0.02)',
-  border: '0.5px solid rgba(255,255,255,0.07)',
+  border: '1px solid rgba(255,255,255,0.2)',
   borderRadius: 16,
 };
 
@@ -116,7 +116,7 @@ export default function DoctorPrescriptionsPage() {
 
   const inp = {
     style: {
-      width: '100%', background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.08)',
+      width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
       borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#fff', outline: 'none', boxSizing: 'border-box',
     },
   };
@@ -137,7 +137,7 @@ export default function DoctorPrescriptionsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 20, alignItems: 'start' }}>
 
         {/* Patient list */}
-        <div style={{ ...card, overflow: 'hidden' }}>
+        <div className="neon-glass-card obsidian-card" style={{ overflow: 'hidden', borderRadius: 16 }}>
           <div style={{ padding: '16px 18px', borderBottom: '0.5px solid rgba(255,255,255,0.07)', fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
             Confirmed patients ({patients.length})
           </div>

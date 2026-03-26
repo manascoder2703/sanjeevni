@@ -27,7 +27,10 @@ export default function IntegratedHeader() {
       <div 
         className="flex items-center gap-4 transition-all duration-300 ease-in-out pl-2"
       >
-        <Link href="/dashboard" className="flex items-center gap-3 group">
+        <Link 
+          href={user?.role === 'doctor' ? '/dashboard/doctor' : '/dashboard/patient'} 
+          className="flex items-center gap-3 group"
+        >
           <div className="size-9 bg-white/10 border border-white/20 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.1)] group-hover:scale-105 transition-all">
             <Stethoscope size={18} className="text-white" />
           </div>

@@ -252,9 +252,10 @@ export default function CallLogsView({ role }) {
     }
   };
 
+  // Standard card object for components that need to pass it to style prop directly (will keep border but should match globals.css opacity)
   const card = {
     background: 'rgba(255,255,255,0.02)',
-    border: '0.5px solid rgba(255,255,255,0.07)',
+    border: '1px solid rgba(255,255,255,0.2)', 
     borderRadius: 16,
   };
 
@@ -298,7 +299,7 @@ export default function CallLogsView({ role }) {
           { label: 'Missed', value: stats.missed, color: '#fb7185' },
           { label: 'Total talk time', value: stats.talkTime, color: '#fff' },
         ].map(s => (
-          <div key={s.label} style={{ ...card, padding: '16px 18px' }}>
+          <div key={s.label} className="neon-glass-card obsidian-card" style={{ padding: '16px 18px', borderRadius: '16px' }}>
             <div style={{ fontSize: 28, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value}</div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 5 }}>{s.label}</div>
           </div>
@@ -336,11 +337,11 @@ export default function CallLogsView({ role }) {
 
       {/* Logs */}
       {loading ? (
-        <div style={{ ...card, padding: 48, textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>
+        <div className="neon-glass-card obsidian-card" style={{ padding: 48, textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>
           Loading call logs...
         </div>
       ) : grouped.length === 0 ? (
-        <div style={{ ...card, padding: 48, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <div className="neon-glass-card obsidian-card" style={{ padding: 48, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Phone size={20} color="rgba(255,255,255,0.2)" />
           </div>
@@ -348,7 +349,7 @@ export default function CallLogsView({ role }) {
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>Calls will appear here after your first consultation</div>
         </div>
       ) : (
-        <div style={{ ...card, overflow: 'hidden' }}>
+        <div className="neon-glass-card obsidian-card" style={{ overflow: 'hidden' }}>
           {grouped.map(([date, rows], gi) => (
             <div key={date}>
               <div style={{ padding: '8px 18px', background: 'rgba(255,255,255,0.015)', borderBottom: '0.5px solid rgba(255,255,255,0.06)', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
