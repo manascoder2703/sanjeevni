@@ -139,6 +139,17 @@ export default function AIAgentWidget() {
         if (doctors && doctors.length > 0) doctorId = doctors[0]._id;
       }
       if (!doctorId) throw new Error("Doctor record not found");
+
+      // STEP 1: Acquire Booking Lock (Required by backend)
+      const lockRes = await fetch('/api/appointments/lock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ doctorId, date: details.date, timeSlot: details.timeSlot })
+      });
+      const lockData = await lockRes.json();
+      if (!lockRes.ok) throw new Error(lockData.error || "Could not lock slot");
+
+      // STEP 2: Confirm Booking
       const bookRes = await fetch('/api/appointments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

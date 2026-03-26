@@ -44,9 +44,11 @@ export async function POST(request) {
     // 3. Use Gemini to parse intent into JSON
     const model = getGeminiModel(INTENT_PARSING_PROMPT);
     
-    // Provide history for context-aware parsing
+    // Provide current date and history for context-aware parsing
+    const now = new Date();
+    const currentDateStr = now.toISOString().split('T')[0];
     const historyText = session?.messages?.slice(-5).map(m => `${m.role}: ${m.content}`).join('\n') || '';
-    const contextPrompt = historyText ? `History:\n${historyText}\n\n` : '';
+    const contextPrompt = `Today's Date: ${currentDateStr}\n${historyText ? `History:\n${historyText}\n\n` : ''}`;
     
     const result = await model.generateContent(`${contextPrompt}Role: ${role}\nUser Message: ${message.trim()}`);
 
