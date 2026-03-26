@@ -472,6 +472,18 @@ export default function AIAgentWidget() {
                                 </div>
                               </div>
                             )}
+                            {m.action.type === 'ACTION' && (
+                              <div className="pt-16 border-t border-white/5">
+                                <button 
+                                  disabled={executing} 
+                                  onClick={() => confirmBooking(m.action.payload)} 
+                                  className="px-12! h-20! bg-white/5 border border-white/10 hover:border-white/20 text-white/90 font-black text-2xl rounded-[32px] flex items-center gap-6 transition-all transform active:scale-95 hover:bg-white/10"
+                                >
+                                  <Sparkles size={28} className="text-sky-400" />
+                                  {executing ? 'Executing...' : m.action.label}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
