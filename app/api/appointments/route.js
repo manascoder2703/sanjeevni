@@ -129,6 +129,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid appointment time selected' }, { status: 400 });
     }
 
+    if (scheduledDateTime < now) {
+      return NextResponse.json({ error: 'plss book a future time as this time has already expired' }, { status: 400 });
+    }
+
     const doctor = await Doctor.findById(doctorId);
     if (doctor?.userId?.toString() === user.userId) {
       return NextResponse.json({ error: 'You cannot book an appointment with yourself.' }, { status: 400 });

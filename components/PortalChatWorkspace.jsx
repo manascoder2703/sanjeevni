@@ -100,9 +100,19 @@ function AudioPlayer({ src, mine }) {
   const [progress, setProgress] = useState(0);
   const audioRef = useRef(null);
 
-  const toggle = () => {
-    if (playing) audioRef.current.pause();
-    else audioRef.current.play();
+  const toggle = async () => {
+    if (!audioRef.current) return;
+    
+    // For Safari: Resuming AudioContext or playing inside a user gesture
+    if (!playing) {
+      try {
+        await audioRef.current.play();
+      } catch (err) {
+        console.error("Playback failed:", err);
+      }
+    } else {
+      audioRef.current.pause();
+    }
     setPlaying(!playing);
   };
 
@@ -581,21 +591,21 @@ export default function PortalChatWorkspace({ viewerRole }) {
     }
   };
 
+  const blobToBase64 = (blob) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
   const sendVoiceMessage = async (blob, duration) => {
     setSending(true);
     try {
-      const formData = new FormData();
-      formData.append('audio', blob, 'voice.webm');
-
-      const uploadRes = await fetch('/api/chat/upload', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed');
-
-      await sendMessage(uploadData.url, 'voice', duration);
+      // Convert blob to Base64 to bypass filesystem restrictions on server
+      const base64Audio = await blobToBase64(blob);
+      await sendMessage(base64Audio, 'voice', duration);
     } catch (err) {
       console.error('Voice send error:', err);
       toast.error(err.message || 'Failed to send voice message');

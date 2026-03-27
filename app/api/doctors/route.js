@@ -10,21 +10,32 @@ export async function GET(request) {
     const specialization = searchParams.get('specialization');
     const search = searchParams.get('search');
 
-    const query = { isApproved: true };
+    let query = search ? {} : { isApproved: true };
     if (specialization && specialization !== 'All') {
       query.specialization = specialization;
     }
 
-    let doctors = await Doctor.find(query).populate('userId', 'name email avatar').lean();
-
+    // 1. If search is provided, find matching users first
     if (search) {
-      const s = search.toLowerCase();
-      doctors = doctors.filter(
-        (d) =>
-          d.userId?.name?.toLowerCase().includes(s) ||
-          d.specialization?.toLowerCase().includes(s)
-      );
+      const users = await User.find({
+        role: 'doctor',
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } }
+        ]
+      }).select('_id');
+      
+      const userIds = users.map(u => u._id);
+      query = { 
+        ...query, 
+        $or: [
+          { userId: { $in: userIds } },
+          { specialization: { $regex: search, $options: 'i' } }
+        ]
+      };
     }
+
+    const doctors = await Doctor.find(query).populate('userId', 'name email avatar').lean();
 
     return NextResponse.json({ doctors });
   } catch (error) {

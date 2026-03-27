@@ -205,15 +205,17 @@ export default function AIAgentWidget() {
   const [fetchingSlots, setFetchingSlots] = useState(false);
   const [activeSlotPickerId, setActiveSlotPickerId] = useState(null);
 
-  const fetchAvailableSlots = async (doctorName, date) => {
+  const fetchAvailableSlots = async (doctorName, date, doctorId = null) => {
     setFetchingSlots(true);
     try {
-      const cleanName = doctorName.replace(/^(dr\.?|doctor|mr\.?|ms\.?|mrs\.?)\s+/i, '').trim();
-      const searchRes = await fetch(`/api/doctors?search=${encodeURIComponent(cleanName)}`);
-      const { doctors } = await searchRes.json();
-      if (!doctors || doctors.length === 0) throw new Error("Doctor not found");
-      
-      const docId = doctors[0]._id;
+      let docId = doctorId;
+      if (!docId) {
+        const cleanName = doctorName.replace(/^(dr\.?|doctor|mr\.?|ms\.?|mrs\.?)\s+/i, '').trim();
+        const searchRes = await fetch(`/api/doctors?search=${encodeURIComponent(cleanName)}`);
+        const { doctors } = await searchRes.json();
+        if (!doctors || doctors.length === 0) throw new Error("Doctor not found");
+        docId = doctors[0]._id;
+      }
       const res = await fetch(`/api/doctors/${docId}?date=${encodeURIComponent(date)}`);
       const data = await res.json();
       
@@ -223,15 +225,20 @@ export default function AIAgentWidget() {
         : []; // This is tricky, we need a list of ALL possible slots to filter
       
       // Let's use a simpler approach: get all slots from DEFAULT_TIME_WINDOWS logic
-      // Actually, let's just use the ones that are NOT booked/locked
       const slotStates = data.slotStates || {};
       const now = new Date();
-      const isToday = date === now.toISOString().split('T')[0];
+      const isToday = date === toYYYYMMDD(now);
+
+      // Generate all 24-hour slots (1-hour increments)
+      const allDaySlots = [];
+      for (let h = 0; h < 24; h++) {
+        let displayHour = h % 12;
+        if (displayHour === 0) displayHour = 12;
+        const meridiem = h < 12 ? "AM" : "PM";
+        allDaySlots.push(`${String(displayHour).padStart(2, '0')}:00 ${meridiem}`);
+      }
       
-      // Hardcoded list of common slots for the picker (can be expanded)
-      const commonSlots = ["09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "01:10 PM", "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM", "06:00 PM", "07:00 PM", "08:00 PM"];
-      
-      const available = commonSlots.filter(slot => {
+      const available = allDaySlots.filter(slot => {
         const state = slotStates[slot] || 'available';
         if (state !== 'available') return false;
         if (isToday) {
@@ -298,6 +305,47 @@ export default function AIAgentWidget() {
 
   const [showPlusMenu, setShowPlusMenu] = useState(false);
 
+  const toYYYYMMDD = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const localFallbackParse = (text) => {
+    const low = text.toLowerCase();
+    const drMatch = text.match(/(?:dr\.?\s+)([a-zA-Z\s]+)/i);
+    const dateMatch = text.match(/(\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*)|(\d{4}-\d{2}-\d{2})|tomorrow|today/i);
+    const timeMatch = text.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm))/i);
+    
+    let intent = 'UNKNOWN';
+    if (low.includes('book') || low.includes('appointment') || low.includes('schedule')) intent = 'BOOK_DOCTOR';
+    else if (low.includes('search') || low.includes('find')) intent = 'SEARCH_DOCTORS';
+    else if (drMatch || dateMatch || timeMatch) intent = 'PROVIDE_INFO';
+    
+    const params = {};
+    if (drMatch) params.doctorName = drMatch[1].trim();
+    if (timeMatch) params.timeSlot = timeMatch[0].toUpperCase();
+    if (dateMatch) {
+       const rawDate = dateMatch[0].toLowerCase();
+       if (rawDate === 'tomorrow') {
+         const d = new Date(); d.setDate(d.getDate() + 1);
+         params.date = toYYYYMMDD(d);
+       } else if (rawDate === 'today') {
+         params.date = toYYYYMMDD(new Date());
+       } else if (rawDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+         params.date = rawDate;
+       } else {
+         try {
+           const d = new Date(rawDate + " " + new Date().getFullYear());
+           if (!isNaN(d.getTime())) params.date = toYYYYMMDD(d);
+         } catch(e) {}
+       }
+    }
+    
+    return { intent, params, reply: "" };
+  };
+
   const clearConversation = () => {
     setMessages([]);
     setShowPlusMenu(false);
@@ -313,15 +361,43 @@ export default function AIAgentWidget() {
     setMessages(prev => [...prev, { id: Date.now(), role: 'user', content: text }]);
     setInput('');
     setLoading(true);
+
+    let parsedData;
     try {
-      const parseRes = await fetch('/api/ai/agent/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }) });
-      const parsedData = await parseRes.json();
-      if (parsedData.error) throw new Error(parsedData.error);
+      // 1. AI Parsing with Failsafe
+      try {
+        const parseRes = await fetch('/api/ai/agent/parse', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ message: text }) 
+        });
+        parsedData = await parseRes.json();
+        if (parsedData.error) throw new Error(parsedData.error);
+      } catch (err) {
+        console.warn('AI Parse Fallback active:', err.message);
+        parsedData = localFallbackParse(text);
+        
+        // Deep Fallback: Direct doctor search if AI is down and regex missed it
+        if (parsedData.intent === 'UNKNOWN' && text.length < 30) {
+          try {
+            const searchRes = await fetch(`/api/doctors?search=${encodeURIComponent(text)}`);
+            const { doctors: fallbackDoctors } = await searchRes.json();
+            if (fallbackDoctors && fallbackDoctors.length > 0) {
+              parsedData.intent = 'PROVIDE_INFO';
+              parsedData.params = { 
+                doctorName: fallbackDoctors[0].userId.name,
+                doctorId: fallbackDoctors[0]._id 
+              };
+            }
+          } catch(e) {}
+        }
+      }
+
+      // 2. Logic Processing
       let replyContent = parsedData.reply || '';
       let actionData = null;
       let newBookingContext = bookingContext;
 
-      // Handle explicit reset keywords
       const lowerText = text.toLowerCase();
       const isResetRequest = lowerText.includes('new appointment') || 
                             lowerText.includes('start over') || 
@@ -341,6 +417,8 @@ export default function AIAgentWidget() {
           if (newBookingContext.doctorName && newBookingContext.date && !newBookingContext.timeSlot) {
             if (!parsedData.reply) replyContent = `Drafted for ${newBookingContext.doctorName} on ${newBookingContext.date}. Would you like to see available time slots?`;
             actionData = { type: 'TIME_PICKER', payload: newBookingContext };
+          } else if (!newBookingContext.doctorName && !newBookingContext.date && !newBookingContext.timeSlot) {
+            if (!parsedData.reply) replyContent = "Sure! I can help you book an appointment. Which doctor would you like to see, or should I search for a specialist?";
           } else if (!newBookingContext.doctorName || !newBookingContext.date || !newBookingContext.timeSlot) {
             if (!parsedData.reply) replyContent = `Need ${!newBookingContext.doctorName ? 'doctor name,' : ''} ${!newBookingContext.date ? 'date,' : ''} ${!newBookingContext.timeSlot ? 'and time' : ''}.`;
           } else {
@@ -348,16 +426,20 @@ export default function AIAgentWidget() {
             actionData = { type: 'ACTION', label: 'Confirm Booking', payload: newBookingContext };
           }
           break;
+        case 'ALREADY_BOOKED':
+          replyContent = parsedData.reply || "You already have an appointment at this time.";
+          actionData = { type: 'ALREADY_BOOKED' };
+          break;
         case 'INVALID_REQUEST':
           replyContent = parsedData.params?.reason || "This request is invalid.";
           break;
         case 'SEARCH_DOCTORS':
           if (!replyContent) replyContent = `Searching...`;
           const dr = await fetch(`/api/doctors?specialization=${parsedData.params?.specialty || 'All'}`);
-          const { doctors } = await dr.json();
-          if (doctors?.length > 0) { 
+          const { doctors: searchDoctors } = await dr.json();
+          if (searchDoctors?.length > 0) { 
             if (!parsedData.reply) replyContent = `Specialists found:`; 
-            actionData = { type: 'DOCTOR_LIST', data: doctors.slice(0, 3) }; 
+            actionData = { type: 'DOCTOR_LIST', data: searchDoctors.slice(0, 3) }; 
           }
           else if (!parsedData.reply) replyContent = `No specialists found.`;
           break;
@@ -378,7 +460,12 @@ export default function AIAgentWidget() {
         })
       }).catch(e => console.error("Sync error:", e));
 
-    } catch (err) { toast.error("Process failed"); } finally { setLoading(false); }
+    } catch (err) {
+      console.error('HandleSend Error:', err);
+      toast.error("Process failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -473,7 +560,7 @@ export default function AIAgentWidget() {
                                       if (activeSlotPickerId === m.id) setActiveSlotPickerId(null);
                                       else {
                                         setActiveSlotPickerId(m.id);
-                                        fetchAvailableSlots(m.action.payload.doctorName, m.action.payload.date);
+                                        fetchAvailableSlots(m.action.payload.doctorName, m.action.payload.date, m.action.payload.doctorId);
                                       }
                                     }}
                                     className="px-10 h-16 bg-white/5 border border-white/10 hover:border-white/20 text-white/70 font-bold text-lg rounded-2xl flex items-center gap-4 transition-all hover:bg-white/10"
