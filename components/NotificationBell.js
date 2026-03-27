@@ -82,7 +82,7 @@ export default function NotificationBell() {
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500" />
                       )}
                       <div className="flex gap-3">
-                        <div className={`p-2 rounded-lg bg-white/5 border border-white/10 h-fit ${n.type === 'booking' ? 'text-blue-400' : 'text-green-400'}`}>
+                        <div className={`p-2! rounded-lg bg-white/5 border border-white/10 h-fit ${n.type === 'booking' ? 'text-blue-400' : 'text-green-400'}`}>
                           {n.type === 'booking' ? <Calendar size={14} /> : <CheckCircle2 size={14} />}
                         </div>
                         <div className="flex-1">
@@ -102,7 +102,7 @@ export default function NotificationBell() {
             {notifications.length > 0 && (
               <button 
                 onClick={clearNotifications}
-                className="w-full p-3 text-[10px] uppercase font-black tracking-widest text-white/20 hover:text-red-400 hover:bg-red-500/5 transition-all flex items-center justify-center gap-2 border-t border-white/5"
+                className="w-full p-3! text-[10px] uppercase font-black tracking-widest text-white/20 hover:text-red-400 hover:bg-red-500/5 transition-all flex items-center justify-center gap-2 border-t border-white/5"
               >
                 <Trash2 size={12} />
                 Clear history

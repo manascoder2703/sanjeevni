@@ -54,7 +54,7 @@ export default function IntegratedHeader() {
             minWidth: '200px'
           }}
           className={`
-            hidden md:flex gap-3 px-6 h-9 rounded-full border transition-all duration-300 group/agent
+            hidden md:flex gap-3 px-6! h-9! rounded-full border transition-all duration-300 group/agent
             ${isAgentVisible 
               ? 'bg-sky-400/20 border-sky-400/40 text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.2)]' 
               : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:border-white/20 hover:text-white'}

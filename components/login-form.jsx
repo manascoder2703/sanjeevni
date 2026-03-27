@@ -64,18 +64,18 @@ export function LoginForm({ className, ...props }) {
       {pendingOTP && <OTPModal onSuccess={handleOTPSuccess} />}
 
       <div className={cn("flex flex-col gap-6", className)} {...props}>
-        <Card className="border-none bg-transparent shadow-none p-0 md:p-0 rounded-none">
-          <CardHeader className="p-0 mb-8 md:mb-10 text-center">
+        <Card className="border-none bg-transparent shadow-none p-0! md:p-0! rounded-none">
+          <CardHeader className="p-0! mb-8! md:mb-10! text-center">
             <CardTitle className="text-3xl md:text-[36px] font-black text-white leading-tight">Welcome Back</CardTitle>
-            <CardDescription className="text-zinc-500 text-base font-medium mt-2">
+            <CardDescription className="text-zinc-500 text-base font-medium mt-2!">
               Enter your email below to login to your account
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <form onSubmit={handleSubmit}>
-              <div className="flex flex-col gap-8">
-                <div className="flex flex-col gap-2">
-                  <FieldLabel htmlFor="email" className="text-white text-[14px] font-bold mb-2">Email</FieldLabel>
+              <div className="flex flex-col gap-8!">
+                <div className="flex flex-col gap-2!">
+                  <FieldLabel htmlFor="email" className="text-white text-[14px] font-bold mb-2!">Email</FieldLabel>
                   <Input
                     id="email"
                     type="email"
@@ -83,11 +83,11 @@ export function LoginForm({ className, ...props }) {
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); if (error) setError(''); }}
                     required
-                    className="bg-white/[0.03] border-white/5 text-white h-12 px-4 rounded-xl focus-visible:ring-1 focus-visible:ring-white/10 transition-all placeholder:text-zinc-600"
+                    className="bg-white/[0.03] border-white/5 text-white h-12! px-4! rounded-xl focus-visible:ring-1 focus-visible:ring-white/10 transition-all placeholder:text-zinc-600"
                   />
                 </div>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-col gap-2!">
+                  <div className="flex items-center justify-between mb-2!">
                     <FieldLabel htmlFor="password" className="text-white text-[14px] font-bold">Password</FieldLabel>
                     <Link href="/forgot-password" className="text-[14px] text-zinc-500 hover:text-white transition-colors font-medium">
                       Forgot your password?
@@ -100,12 +100,12 @@ export function LoginForm({ className, ...props }) {
                       value={password}
                       onChange={(e) => { setPassword(e.target.value); if (error) setError(''); }}
                       required
-                      className="bg-white/[0.03] border-white/5 text-white h-12 px-4 pr-12 rounded-xl focus-visible:ring-1 focus-visible:ring-white/10 transition-all placeholder:text-zinc-600"
+                      className="bg-white/[0.03] border-white/5 text-white h-12! px-4! pr-12! rounded-xl focus-visible:ring-1 focus-visible:ring-white/10 transition-all placeholder:text-zinc-600"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors p-1"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors p-1!"
                     >
                       {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
@@ -129,13 +129,13 @@ export function LoginForm({ className, ...props }) {
                   </AnimatePresence>
                 </div>
 
-                <div className="flex flex-col gap-4 mt-4">
-                  <Button type="submit" className="w-full bg-white hover:bg-zinc-200 text-black h-12 font-bold rounded-full transition-all active:scale-[0.98] shadow-xl" disabled={loading}>
+                <div className="flex flex-col gap-4! mt-4!">
+                  <Button type="submit" className="w-full bg-white hover:bg-zinc-200 text-black h-12! font-bold rounded-full transition-all active:scale-[0.98] shadow-xl" disabled={loading}>
                     {loading ? 'Logging in...' : 'Login'}
                   </Button>
                   <button
                     type="button"
-                    className="w-full h-12 flex items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.03] text-white font-bold transition-all duration-300 hover:bg-white hover:text-black hover:border-white hover:shadow-[0_0_30px_rgba(255,255,255,0.25)] active:scale-[0.98]"
+                    className="w-full h-12! flex items-center justify-center gap-3! rounded-full border border-white/10 bg-white/[0.03] text-white font-bold transition-all duration-300 hover:bg-white hover:text-black hover:border-white hover:shadow-[0_0_30px_rgba(255,255,255,0.25)] active:scale-[0.98]"
                     onClick={() => signIn('google', { callbackUrl: '/dashboard/patient' })}
                   >
                     <GoogleLogo className="w-5 h-5 transition-colors group-hover:text-black" />

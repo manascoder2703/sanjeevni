@@ -47,7 +47,7 @@ export default function ExpandingSearch() {
           stiffness: 300,
           damping: 30
         }}
-        className="h-11 rounded-full border backdrop-blur-xl flex items-center overflow-hidden relative group cursor-pointer shadow-lg"
+        className="h-11! rounded-full border backdrop-blur-xl flex items-center overflow-hidden relative group cursor-pointer shadow-lg"
       >
         <div className="absolute left-3 flex items-center justify-center pointer-events-none">
           <Search 

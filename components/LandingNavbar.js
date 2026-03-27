@@ -109,7 +109,7 @@ export default function LandingNavbar() {
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center gap-4">
               {isLoginPage ? (
-                <Link href="/" className="nav-btn-pill-ghost px-3 py-2 text-sm">
+                <Link href="/" className="nav-btn-pill-ghost px-3! py-2! text-sm">
                    Home
                 </Link>
               ) : (
@@ -130,7 +130,7 @@ export default function LandingNavbar() {
                             const element = document.getElementById(link.id);
                             if (element) element.scrollIntoView({ behavior: 'smooth' });
                           }}
-                          className="nav-btn-pill-ghost px-3 py-2 text-sm cursor-pointer border-none bg-transparent relative z-10"
+                          className="nav-btn-pill-ghost px-3! py-2! text-sm cursor-pointer border-none bg-transparent relative z-10"
                         >
                           {link.name}
                         </motion.button>
@@ -140,7 +140,7 @@ export default function LandingNavbar() {
                             whileHover={{ y: -6, scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-                            className={`${link.primary ? 'nav-btn-pill-primary' : 'nav-btn-pill-ghost'} px-3 py-2 text-sm relative z-10`}
+                            className={`${link.primary ? 'nav-btn-pill-primary' : 'nav-btn-pill-ghost'} px-3! py-2! text-sm relative z-10`}
                           >
                             {link.name}
                           </motion.div>
@@ -172,7 +172,7 @@ export default function LandingNavbar() {
                 transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 className="md:hidden overflow-hidden border-t border-white/10"
               >
-                <div className="flex flex-col gap-2 p-6 pb-8">
+                <div className="flex flex-col gap-2! p-6! pb-8!">
                   {navLinks.map((link) => (
                     link.id ? (
                       <button 
@@ -182,7 +182,7 @@ export default function LandingNavbar() {
                           if (element) element.scrollIntoView({ behavior: 'smooth' });
                           setIsMenuOpen(false);
                         }}
-                        className="nav-btn-pill-ghost w-full justify-start py-4 text-base bg-white/5"
+                        className="nav-btn-pill-ghost w-full justify-start py-4! text-base bg-white/5"
                         style={{ touchAction: 'manipulation' }}
                       >
                         {link.name}
@@ -192,7 +192,7 @@ export default function LandingNavbar() {
                         key={link.name}
                         href={link.href}
                         onClick={() => setIsMenuOpen(false)}
-                        className={`${link.primary ? 'nav-btn-pill-primary' : 'nav-btn-pill-ghost'} w-full text-center py-4 text-base ${!link.primary ? 'bg-white/5' : ''}`}
+                        className={`${link.primary ? 'nav-btn-pill-primary' : 'nav-btn-pill-ghost'} w-full text-center py-4! text-base ${!link.primary ? 'bg-white/5' : ''}`}
                         style={{ touchAction: 'manipulation' }}
                       >
                         {link.name}
@@ -213,7 +213,7 @@ export default function LandingNavbar() {
           justify-content: center;
           color: rgba(255, 255, 255, 0.8);
           text-decoration: none;
-          padding: 8px 18px;
+          padding: 8px 18px!important;
           font-size: 14px;
           font-weight: 600;
           border-radius: 999px;
@@ -230,7 +230,7 @@ export default function LandingNavbar() {
           background: white;
           color: #0f172a;
           text-decoration: none;
-          padding: 8px 22px;
+          padding: 8px 22px!important;
           font-size: 14px;
           font-weight: 700;
           border-radius: 999px;

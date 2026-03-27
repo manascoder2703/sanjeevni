@@ -14,7 +14,8 @@ import {
   Trash2,
   Activity,
   Send,
-  AlertCircle
+  AlertCircle,
+  ChevronUp
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAgent } from '@/context/AgentContext';
@@ -286,28 +287,36 @@ export default function AIAgentWidget() {
     const timeMatch = text.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm))/i);
     
     let intent = 'UNKNOWN';
-    if (low.includes('book') || low.includes('appointment') || low.includes('schedule')) intent = 'BOOK_DOCTOR';
-    else if (low.includes('search') || low.includes('find')) intent = 'SEARCH_DOCTORS';
-    else if (drMatch || dateMatch || timeMatch) intent = 'PROVIDE_INFO';
+    let params = {};
+
+    if (low.includes('new appointment') || low.includes('start over') || low.includes('book another')) {
+        intent = 'BOOK_DOCTOR';
+        params.resetContext = true;
+    } else if (low.includes('book') || low.includes('appointment') || low.includes('schedule') || low.includes('see a doctor')) {
+        intent = 'BOOK_DOCTOR';
+    } else if (low.includes('search') || low.includes('find') || low.includes('specialist')) {
+        intent = 'SEARCH_DOCTORS';
+    } else if (drMatch || dateMatch || timeMatch) {
+        intent = 'PROVIDE_INFO';
+    }
     
-    const params = {};
     if (drMatch) params.doctorName = drMatch[1].trim();
     if (timeMatch) params.timeSlot = timeMatch[0].toUpperCase();
     if (dateMatch) {
-       const rawDate = dateMatch[0].toLowerCase();
-       if (rawDate === 'tomorrow') {
-         const d = new Date(); d.setDate(d.getDate() + 1);
-         params.date = toYYYYMMDD(d);
-       } else if (rawDate === 'today') {
-         params.date = toYYYYMMDD(new Date());
-       } else if (rawDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-         params.date = rawDate;
-       } else {
-         try {
-           const d = new Date(rawDate + " " + new Date().getFullYear());
-           if (!isNaN(d.getTime())) params.date = toYYYYMMDD(d);
-         } catch(e) {}
-       }
+        const rawDate = dateMatch[0].toLowerCase();
+        if (rawDate === 'tomorrow') {
+          const d = new Date(); d.setDate(d.getDate() + 1);
+          params.date = toYYYYMMDD(d);
+        } else if (rawDate === 'today') {
+          params.date = toYYYYMMDD(new Date());
+        } else if (rawDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          params.date = rawDate;
+        } else {
+          try {
+            const d = new Date(rawDate + " " + new Date().getFullYear());
+            if (!isNaN(d.getTime())) params.date = toYYYYMMDD(d);
+          } catch(e) {}
+        }
     }
     
     return { intent, params, reply: "" };
@@ -331,32 +340,45 @@ export default function AIAgentWidget() {
 
     let parsedData;
     try {
-      // 1. AI Parsing with Failsafe
-      try {
-        const parseRes = await fetch('/api/ai/agent/parse', { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ message: text }) 
-        });
-        parsedData = await parseRes.json();
-        if (parsedData.error) throw new Error(parsedData.error);
-      } catch (err) {
-        console.warn('AI Parse Fallback active:', err.message);
-        parsedData = localFallbackParse(text);
-        
-        // Deep Fallback: Direct doctor search if AI is down and regex missed it
-        if (parsedData.intent === 'UNKNOWN' && text.length < 30) {
-          try {
-            const searchRes = await fetch(`/api/doctors?search=${encodeURIComponent(text)}`);
-            const { doctors: fallbackDoctors } = await searchRes.json();
-            if (fallbackDoctors && fallbackDoctors.length > 0) {
-              parsedData.intent = 'PROVIDE_INFO';
-              parsedData.params = { 
-                doctorName: fallbackDoctors[0].userId.name,
-                doctorId: fallbackDoctors[0]._id 
-              };
+      // 0. Pre-AI Heuristic Check (Aggressive)
+      const lowerText = text.toLowerCase();
+      const isBookingMgmt = lowerText.includes('new appointment') || 
+                          lowerText.includes('start over') || 
+                          lowerText.includes('book another') || 
+                          lowerText.includes('book a new') ||
+                          lowerText === 'new appt' ||
+                          lowerText === 'book appointment';
+
+      if (isBookingMgmt) {
+        const preFallback = localFallbackParse(text);
+        if (preFallback.intent !== 'UNKNOWN') {
+          console.log('Pre-AI Heuristic Match:', preFallback.intent);
+          parsedData = preFallback;
+        }
+      }
+
+      if (!parsedData) {
+        // 1. AI Parsing with Failsafe
+        try {
+          const parseRes = await fetch('/api/ai/agent/parse', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify({ message: text }) 
+          });
+          parsedData = await parseRes.json();
+          if (parsedData.error) throw new Error(parsedData.error);
+          
+          // Hybrid Fallback: If AI is unsure but local rules are sure, use local
+          if (parsedData.intent === 'UNKNOWN' || !parsedData.intent) {
+            const fallback = localFallbackParse(text);
+            if (fallback.intent !== 'UNKNOWN') {
+              console.log('Using Heuristic Backup:', fallback.intent);
+              parsedData = fallback;
             }
-          } catch(e) {}
+          }
+        } catch (err) {
+          console.warn('AI Parse error, falling back to heuristics:', err.message);
+          parsedData = localFallbackParse(text);
         }
       }
 
@@ -365,7 +387,6 @@ export default function AIAgentWidget() {
       let actionData = null;
       let newBookingContext = bookingContext;
 
-      const lowerText = text.toLowerCase();
       const isResetRequest = lowerText.includes('new appointment') || 
                             lowerText.includes('start over') || 
                             lowerText.includes('book another') ||
@@ -411,7 +432,13 @@ export default function AIAgentWidget() {
           else if (!parsedData.reply) replyContent = `No specialists found.`;
           break;
         default: 
-          if (!replyContent) replyContent = "I'm your assistant. How can I help you today?";
+          if (!replyContent) {
+            if (newBookingContext?.doctorName || newBookingContext?.date) {
+              replyContent = `I appreciate the follow-up. I'm still tracking our discussion for an appointment${newBookingContext.doctorName ? ` with Dr. ${newBookingContext.doctorName}` : ''}${newBookingContext.date ? ` on ${newBookingContext.date}` : ''}. How can I assist further?`;
+            } else {
+              replyContent = "I'm your assistant at Sanjeevni. I can help you find doctors, book appointments, or check symptoms. How can I help you today?";
+            }
+          }
       }
       
       const assistantMessage = { id: Date.now() + 1, role: 'assistant', content: replyContent, action: actionData };
@@ -471,7 +498,7 @@ export default function AIAgentWidget() {
             {/* FLOATING CLOSE BUTTON */}
             <button 
               onClick={() => setIsOpen(false)} 
-              className="absolute top-8 right-12 size-12 flex items-center justify-center hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-all transform hover:rotate-90 z-[160]"
+              className="absolute top-8 right-12 size-12! flex items-center justify-center hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-all transform hover:rotate-90 z-[160]"
             >
               <X size={28} />
             </button>
@@ -520,31 +547,26 @@ export default function AIAgentWidget() {
                               </div>
                             )}
                             {m.action.type === 'TIME_PICKER' && (
-                              <div className="pt-12 border-t border-white/5">
-                                <div className="relative">
+                              <div className="mt-20 pt-16 border-t border-white/10 flex flex-col items-center">
+                                {activeSlotPickerId === m.id ? (
+                                  <TimeDialPicker 
+                                    slotStates={availableSlots.allStates || {}} 
+                                    onSelect={(slot) => handleSlotSelect(slot, m.action.payload, m.id)}
+                                    onCancel={() => setActiveSlotPickerId(null)}
+                                  />
+                                ) : (
                                   <button 
                                     onClick={() => {
-                                      if (activeSlotPickerId === m.id) setActiveSlotPickerId(null);
-                                      else {
-                                        setActiveSlotPickerId(m.id);
-                                        fetchAvailableSlots(m.action.payload.doctorName, m.action.payload.date, m.action.payload.doctorId);
-                                      }
+                                      setActiveSlotPickerId(m.id);
+                                      fetchAvailableSlots(m.action.payload.doctorName, m.action.payload.date, m.action.payload.doctorId);
                                     }}
-                                    className="px-10 h-16 bg-white/5 border border-white/10 hover:border-white/20 text-white/70 font-bold text-lg rounded-2xl flex items-center gap-4 transition-all hover:bg-white/10"
+                                    className="px-12! h-20! bg-white/5 border border-white/10 hover:border-white/30 text-white/80 font-black text-xl rounded-3xl flex items-center gap-6 transition-all hover:bg-white/10 hover:scale-[1.02] active:scale-95 group"
                                   >
-                                    <Clock size={20} className="text-sky-400" />
-                                    {fetchingSlots ? 'Fetching Slots...' : 'View Available Time Slots'}
-                                    <ChevronDown size={18} className={`transition-transform duration-300 ${activeSlotPickerId === m.id ? 'rotate-180' : ''}`} />
+                                    <Clock size={24} className="text-white/40 group-hover:scale-110 transition-transform" />
+                                    {fetchingSlots ? 'Syncing Schedule...' : 'View Available Time Slots'}
+                                    <ChevronDown size={20} className="text-white/20" />
                                   </button>
-                                  
-                                  {activeSlotPickerId === m.id && (
-                                    <TimeDialPicker 
-                                      slotStates={availableSlots.allStates || {}} 
-                                      onSelect={(slot) => handleSlotSelect(slot, m.action.payload, m.id)}
-                                      onCancel={() => setActiveSlotPickerId(null)}
-                                    />
-                                  )}
-                                </div>
+                                )}
                               </div>
                             )}
                             {m.action.type === 'ACTION' && (
@@ -586,7 +608,7 @@ export default function AIAgentWidget() {
                       <button 
                         type="button" 
                         onClick={() => setShowPlusMenu(!showPlusMenu)}
-                        className={`size-12 flex items-center justify-center rounded-full transition-all transform hover:scale-110 active:scale-95 ${showPlusMenu ? 'bg-white/20 text-white rotate-45' : 'bg-white/5 text-white/30 hover:text-white'}`}
+                        className={`size-12! flex items-center justify-center rounded-full transition-all transform hover:scale-110 active:scale-95 ${showPlusMenu ? 'bg-white/20 text-white rotate-45' : 'bg-white/5 text-white/30 hover:text-white'}`}
                       >
                         <Plus size={28} />
                       </button>
@@ -603,7 +625,7 @@ export default function AIAgentWidget() {
                               onClick={clearConversation}
                               className="w-full flex items-center gap-5 px-6! py-5! text-left text-white/60 hover:text-white hover:bg-white/5 rounded-xl transition-all font-medium group"
                             >
-                              <div className="size-12 bg-white/5 rounded-full flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                              <div className="size-12! bg-white/5 rounded-full flex items-center justify-center group-hover:bg-white/10 transition-colors">
                                 <Trash2 size={24} className="text-white/40 group-hover:text-red-400/80 transition-colors" />
                               </div>
                               <div className="flex flex-col">
@@ -636,7 +658,7 @@ export default function AIAgentWidget() {
                         <button 
                           type="button" 
                           onClick={toggleListening}
-                          className="relative size-12 bg-white/5 flex items-center justify-center rounded-full text-white/30 transition-all transform hover:scale-110 active:scale-95"
+                          className="relative size-12! bg-white/5 flex items-center justify-center rounded-full text-white/30 transition-all transform hover:scale-110 active:scale-95"
                         >
                           <motion.div 
                             animate={{ scale: [1, 1.5, 1], opacity: [0.2, 0, 0.2] }} 
@@ -648,9 +670,9 @@ export default function AIAgentWidget() {
                         </button>
                       ) : (
                         input.trim() ? (
-                          <button type="button" onClick={handleSend} disabled={loading} className="size-12 bg-white/5 flex items-center justify-center rounded-full text-white/30 hover:text-white transition-all transform hover:scale-110 active:scale-95"><Send size={28} /></button>
+                          <button type="button" onClick={handleSend} disabled={loading} className="size-12! bg-white/5 flex items-center justify-center rounded-full text-white/30 hover:text-white transition-all transform hover:scale-110 active:scale-95"><Send size={28} /></button>
                         ) : (
-                          <button type="button" onClick={toggleListening} className="size-12 bg-white/5 flex items-center justify-center rounded-full text-white/30 hover:text-white transition-all transform hover:scale-110 active:scale-95"><Mic size={28} /></button>
+                          <button type="button" onClick={toggleListening} className="size-12! bg-white/5 flex items-center justify-center rounded-full text-white/30 hover:text-white transition-all transform hover:scale-110 active:scale-95"><Mic size={28} /></button>
                         )
                       )}
                     </div>
@@ -709,6 +731,7 @@ export default function AIAgentWidget() {
     </>
   );
 }
+
 function TimeDialPicker({ slotStates, onSelect, onCancel }) {
   const [hour, setHour] = useState(9);
   const [minute, setMinute] = useState(0);
@@ -716,83 +739,97 @@ function TimeDialPicker({ slotStates, onSelect, onCancel }) {
 
   const selectedTimeLabel = `${String(hour === 0 ? 12 : hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${period}`;
 
-  const isRangeAvailable = (startTime) => {
-    // Check 60 minutes sequence
+  const isRangeAvailable = () => {
     let h = hour;
     if (period === 'PM' && h !== 12) h += 12;
     if (period === 'AM' && h === 12) h = 0;
-    
     const startTotal = h * 60 + minute;
-    
     for (let i = 0; i < 60; i++) {
         const currentTotal = startTotal + i;
-        if (currentTotal >= 1440) return false; // Past midnight
-        
+        if (currentTotal >= 1440) return false; 
         const curH24 = Math.floor(currentTotal / 60);
         const curM = currentTotal % 60;
         const curH12 = curH24 % 12 || 12;
         const curPeriod = curH24 >= 12 ? 'PM' : 'AM';
         const label = `${String(curH12).padStart(2, '0')}:${String(curM).padStart(2, '0')} ${curPeriod}`;
-        
         if (slotStates[label]) return false;
     }
     return true;
   };
 
-  const available = isRangeAvailable(selectedTimeLabel);
+  const adjust = (type, amt) => {
+    if (type === 'h') setHour(prev => (prev + amt - 1 + 12) % 12 + 1);
+    else if (type === 'm') setMinute(prev => (prev + amt + 60) % 60);
+    else if (type === 'p') setPeriod(prev => prev === 'AM' ? 'PM' : 'AM');
+  };
+
+  const available = isRangeAvailable();
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 15, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      className="absolute left-0 top-full mt-6 w-[340px] bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 z-[300] shadow-[0_32px_64px_rgba(0,0,0,0.6)]"
+      initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
+      style={{ 
+        padding: '64px', 
+        maxWidth: '480px', 
+        borderRadius: '56px',
+        backgroundColor: 'rgba(5, 5, 5, 0.8)',
+        backdropFilter: 'blur(40px)',
+        border: '1px solid rgba(255, 255, 255, 0.05)',
+        boxShadow: '0 45px 130px rgba(0,0,0,0.95)',
+        position: 'relative'
+      }}
+      className="w-full"
     >
-      <div className="flex justify-between items-center mb-6">
-        <h4 className="text-white/40 text-xs font-black uppercase tracking-[0.2em]">Select Time</h4>
-        <button onClick={onCancel} className="text-white/20 hover:text-white transition-colors"><X size={16}/></button>
+      <button 
+        onClick={onCancel} 
+        style={{ position: 'absolute', top: '32px', right: '32px', zIndex: 50 }}
+        className="text-white/10 hover:text-white transition-colors"
+      >
+        <X size={20}/>
+      </button>
+
+      <div className="flex justify-center items-center mb-16!">
+        <h4 className="text-white/60 text-[10px] font-black uppercase tracking-[0.8em] text-center w-full">Select Appointment Time</h4>
       </div>
 
-      <div className="flex items-center justify-center gap-4 mb-8 h-40 overflow-hidden relative">
-        {/* HOUR */}
-        <div className="flex flex-col items-center w-16 overflow-y-auto no-scrollbar snap-y snap-mandatory" style={{ height: '100%' }}>
-            {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
-                <div key={h} onClick={() => setHour(h)} className={`h-12 shrink-0 flex items-center justify-center text-3xl font-black cursor-pointer snap-center transition-all ${hour === h ? 'text-sky-400 scale-125' : 'text-white/10 hover:text-white/40'}`}>
-                    {String(h).padStart(2, '0')}
-                </div>
-            ))}
+      <div className="flex items-center justify-center mb-16! h-32! relative" style={{ gap: '40px' }}>
+        {/* HOUR STEPPER */}
+        <div className="flex flex-col items-center group">
+          <button onClick={() => adjust('h', 1)} className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all mb-2"><ChevronUp size={24} className="text-white"/></button>
+          <div className="text-6xl font-black text-white select-none">{String(hour).padStart(2, '0')}</div>
+          <button onClick={() => adjust('h', -1)} className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all mt-2"><ChevronDown size={24} className="text-white"/></button>
         </div>
-        <div className="text-white/10 text-3xl font-black mb-1">:</div>
-        {/* MINUTE */}
-        <div className="flex flex-col items-center w-16 overflow-y-auto no-scrollbar snap-y snap-mandatory" style={{ height: '100%' }}>
-            {Array.from({ length: 60 }, (_, i) => i).map(m => (
-                <div key={m} onClick={() => setMinute(m)} className={`h-12 shrink-0 flex items-center justify-center text-3xl font-black cursor-pointer snap-center transition-all ${minute === m ? 'text-sky-400 scale-125' : 'text-white/10 hover:text-white/40'}`}>
-                    {String(m).padStart(2, '0')}
-                </div>
-            ))}
+
+        <div className="text-4xl font-black text-white/5 pb-1">:</div>
+
+        {/* MINUTE STEPPER */}
+        <div className="flex flex-col items-center group">
+          <button onClick={() => adjust('m', 1)} className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all mb-2"><ChevronUp size={24} className="text-white"/></button>
+          <div className="text-6xl font-black text-white select-none">{String(minute).padStart(2, '0')}</div>
+          <button onClick={() => adjust('m', -1)} className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all mt-2"><ChevronDown size={24} className="text-white"/></button>
         </div>
-        {/* PERIOD */}
-        <div className="flex flex-col items-center w-20 justify-center gap-4">
-            {['AM', 'PM'].map(p => (
-                <div key={p} onClick={() => setPeriod(p)} className={`text-xl font-bold cursor-pointer transition-all ${period === p ? 'text-sky-400' : 'text-white/10 hover:text-white/40'}`}>
-                    {p}
-                </div>
-            ))}
+
+        {/* PERIOD TOGGLE */}
+        <div className="flex flex-col items-center ml-8 pl-8 border-l border-white/5 group">
+          <button onClick={() => adjust('p', 1)} className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all mb-2"><ChevronUp size={24} className="text-white"/></button>
+          <div className="text-3xl font-black text-white/90 select-none tracking-tighter">{period}</div>
+          <button onClick={() => adjust('p', -1)} className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all mt-2"><ChevronDown size={24} className="text-white"/></button>
         </div>
       </div>
 
-      <div className={`p-4 rounded-2xl flex items-center gap-3 mb-6 transition-all border ${available ? 'bg-sky-500/5 border-sky-500/10 text-sky-400' : 'bg-red-500/5 border-red-500/10 text-red-400'}`}>
-        {available ? <Check size={18} /> : <AlertCircle size={18} />}
-        <span className="text-sm font-bold tracking-tight">
-            {available ? 'This slot is available' : 'This slot is already booked'}
+      <div className={`mb-8! py-2! flex items-center justify-center gap-4 transition-all opacity-60`}>
+        {available ? <Check size={20} className="text-white/40" /> : <AlertCircle size={20} className="text-red-400" />}
+        <span className="text-[14px] font-medium tracking-wide uppercase">
+          {available ? 'Slot is available' : 'This time is booked'}
         </span>
       </div>
 
       <button
         disabled={!available}
         onClick={() => onSelect(selectedTimeLabel)}
-        className={`w-full h-14 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all ${available ? 'bg-sky-500 text-white shadow-[0_8px_25px_rgba(56,189,248,0.4)] hover:scale-[1.02] active:scale-95' : 'bg-white/5 text-white/10 cursor-not-allowed'}`}
+        className={`w-full h-20! mt-8! rounded-[32px] font-black text-sm uppercase tracking-[0.4em] transition-all relative overflow-hidden group ${available ? 'bg-white/5 text-white border border-white/10 hover:bg-white/10' : 'bg-white/2 text-white/5 cursor-not-allowed border-transparent'}`}
       >
-        Confirm Selection
+        <span className="relative z-10">Confirm Selection</span>
       </button>
     </motion.div>
   );

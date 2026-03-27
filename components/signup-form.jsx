@@ -93,8 +93,8 @@ export function SignupForm({ className, role = 'patient', ...props }) {
       {pendingOTP && <OTPModal onSuccess={handleOTPSuccess} />}
 
       <div className={cn("flex flex-col gap-6", className)} {...props}>
-        <Card className="border-none bg-transparent shadow-none p-0 md:p-0 rounded-none">
-          <CardHeader className="p-0 mb-8 md:mb-10 text-center">
+        <Card className="border-none bg-transparent shadow-none p-0! md:p-0! rounded-none">
+          <CardHeader className="p-0! mb-8! md:mb-10! text-center">
             <CardTitle className="text-3xl md:text-[36px] font-black text-white leading-tight">
               Join as a {role.charAt(0).toUpperCase() + role.slice(1)}
             </CardTitle>
@@ -106,15 +106,15 @@ export function SignupForm({ className, role = 'patient', ...props }) {
             <form onSubmit={handleSubmit}>
               <FieldGroup className="gap-8">
                 <Field>
-                  <FieldLabel htmlFor="name" className="text-white text-[14px] font-bold mb-2">Full Name</FieldLabel>
+                  <FieldLabel htmlFor="name" className="text-white text-[14px] font-bold mb-2!">Full Name</FieldLabel>
                   <Input id="name" type="text" placeholder="John Doe" required value={form.name} onChange={handleChange}
-                    className="bg-white/[0.03] border-white/5 text-white h-12 px-4 rounded-xl focus-visible:ring-1 focus-visible:ring-white/10 transition-all placeholder:text-zinc-600" />
+                    className="bg-white/[0.03] border-white/5 text-white h-12! px-4! rounded-xl focus-visible:ring-1 focus-visible:ring-white/10 transition-all placeholder:text-zinc-600" />
                 </Field>
 
                 <Field>
-                  <FieldLabel htmlFor="email" className="text-white text-[14px] font-bold mb-2">Email</FieldLabel>
+                  <FieldLabel htmlFor="email" className="text-white text-[14px] font-bold mb-2!">Email</FieldLabel>
                   <Input id="email" type="email" placeholder="m@example.com" required value={form.email} onChange={handleChange}
-                    className="bg-white/[0.03] border-white/5 text-white h-12 px-4 rounded-xl focus-visible:ring-1 focus-visible:ring-white/10 transition-all placeholder:text-zinc-600" />
+                    className="bg-white/[0.03] border-white/5 text-white h-12! px-4! rounded-xl focus-visible:ring-1 focus-visible:ring-white/10 transition-all placeholder:text-zinc-600" />
                 </Field>
 
                 {role === 'doctor' && (
@@ -122,7 +122,7 @@ export function SignupForm({ className, role = 'patient', ...props }) {
                     <Field>
                       <FieldLabel className="text-white text-[14px] font-bold mb-2">Specialization</FieldLabel>
                       <Select onValueChange={(val) => setForm(prev => ({ ...prev, specialization: val }))} required>
-                        <SelectTrigger className="bg-white/[0.03] border-white/5 text-white h-12 px-4 rounded-xl">
+                        <SelectTrigger className="bg-white/[0.03] border-white/5 text-white h-12! px-4! rounded-xl">
                           <SelectValue placeholder="Select Specialization" />
                         </SelectTrigger>
                         <SelectContent className="bg-black/40 backdrop-blur-xl border-white/10 text-white min-w-[200px]">
@@ -136,7 +136,7 @@ export function SignupForm({ className, role = 'patient', ...props }) {
                     <Field>
                       <FieldLabel className="text-white text-[14px] font-bold mb-2">Gender</FieldLabel>
                       <Select onValueChange={(val) => setForm(prev => ({ ...prev, gender: val }))}>
-                        <SelectTrigger className="bg-white/[0.03] border-white/5 text-white h-12 px-4 rounded-xl">
+                        <SelectTrigger className="bg-white/[0.03] border-white/5 text-white h-12! px-4! rounded-xl">
                           <SelectValue placeholder="Select Gender" />
                         </SelectTrigger>
                         <SelectContent className="bg-black/40 backdrop-blur-xl border-white/10 text-white">
@@ -147,32 +147,32 @@ export function SignupForm({ className, role = 'patient', ...props }) {
                       </Select>
                     </Field>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4!">
                       <Field>
-                        <FieldLabel htmlFor="fee" className="text-white text-[14px] font-bold mb-2">Fee (₹)</FieldLabel>
+                        <FieldLabel htmlFor="fee" className="text-white text-[14px] font-bold mb-2!">Fee (₹)</FieldLabel>
                         <div className="relative group">
                           <Input id="fee" type="number" value={form.fee} onChange={handleChange}
-                            className="bg-white/[0.03] border-white/5 text-white h-12 px-4 rounded-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                            className="bg-white/[0.03] border-white/5 text-white h-12! px-4! rounded-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button type="button" onClick={() => setForm(prev => ({ ...prev, fee: parseInt(prev.fee, 10) + 100 }))} className="p-0.5 hover:bg-white/10 rounded-t-md text-white/40 hover:text-white transition-colors">
+                            <button type="button" onClick={() => setForm(prev => ({ ...prev, fee: parseInt(prev.fee, 10) + 100 }))} className="p-0.5! hover:bg-white/10 rounded-t-md text-white/40 hover:text-white transition-colors">
                               <ChevronUpIcon className="w-3 h-3" />
                             </button>
-                            <button type="button" onClick={() => setForm(prev => ({ ...prev, fee: Math.max(0, parseInt(prev.fee, 10) - 100) }))} className="p-0.5 hover:bg-white/10 rounded-b-md text-white/40 hover:text-white transition-colors">
+                            <button type="button" onClick={() => setForm(prev => ({ ...prev, fee: Math.max(0, parseInt(prev.fee, 10) - 100) }))} className="p-0.5! hover:bg-white/10 rounded-b-md text-white/40 hover:text-white transition-colors">
                               <ChevronDownIcon className="w-3 h-3" />
                             </button>
                           </div>
                         </div>
                       </Field>
                       <Field>
-                        <FieldLabel htmlFor="experience" className="text-white text-[14px] font-bold mb-2">Exp (yrs)</FieldLabel>
+                        <FieldLabel htmlFor="experience" className="text-white text-[14px] font-bold mb-2!">Exp (yrs)</FieldLabel>
                         <div className="relative group">
                           <Input id="experience" type="number" value={form.experience} onChange={handleChange}
-                            className="bg-white/[0.03] border-white/5 text-white h-12 px-4 rounded-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                            className="bg-white/[0.03] border-white/5 text-white h-12! px-4! rounded-xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button type="button" onClick={() => setForm(prev => ({ ...prev, experience: parseInt(prev.experience, 10) + 1 }))} className="p-0.5 hover:bg-white/10 rounded-t-md text-white/40 hover:text-white transition-colors">
+                            <button type="button" onClick={() => setForm(prev => ({ ...prev, experience: parseInt(prev.experience, 10) + 1 }))} className="p-0.5! hover:bg-white/10 rounded-t-md text-white/40 hover:text-white transition-colors">
                               <ChevronUpIcon className="w-3 h-3" />
                             </button>
-                            <button type="button" onClick={() => setForm(prev => ({ ...prev, experience: Math.max(0, parseInt(prev.experience, 10) - 1) }))} className="p-0.5 hover:bg-white/10 rounded-b-md text-white/40 hover:text-white transition-colors">
+                            <button type="button" onClick={() => setForm(prev => ({ ...prev, experience: Math.max(0, parseInt(prev.experience, 10) - 1) }))} className="p-0.5! hover:bg-white/10 rounded-b-md text-white/40 hover:text-white transition-colors">
                               <ChevronDownIcon className="w-3 h-3" />
                             </button>
                           </div>
@@ -182,31 +182,31 @@ export function SignupForm({ className, role = 'patient', ...props }) {
                   </>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6!">
                   <Field>
-                    <FieldLabel htmlFor="password" className="text-white text-[14px] font-bold mb-2">Password</FieldLabel>
+                    <FieldLabel htmlFor="password" className="text-white text-[14px] font-bold mb-2!">Password</FieldLabel>
                     <div className="relative">
                       <Input id="password" type={showPassword ? "text" : "password"} required value={form.password} onChange={handleChange}
-                        className="bg-white/[0.03] border-white/5 text-white h-12 px-4 pr-12 rounded-xl focus-visible:ring-1 focus-visible:ring-white/10 transition-all placeholder:text-zinc-600" />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors p-1">
+                        className="bg-white/[0.03] border-white/5 text-white h-12! px-4! pr-12! rounded-xl focus-visible:ring-1 focus-visible:ring-white/10 transition-all placeholder:text-zinc-600" />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors p-1!">
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-                    <FieldDescription className="text-zinc-600 text-[12px] mt-1.5">Min 8 chars</FieldDescription>
+                    <FieldDescription className="text-zinc-600 text-[12px] mt-1.5!">Min 8 chars</FieldDescription>
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="confirmPassword" className="text-white text-[14px] font-bold mb-2">Confirm</FieldLabel>
+                    <FieldLabel htmlFor="confirmPassword" className="text-white text-[14px] font-bold mb-2!">Confirm</FieldLabel>
                     <Input id="confirmPassword" type="password" required value={form.confirmPassword} onChange={handleChange}
-                      className="bg-white/[0.03] border-white/5 text-white h-12 px-4 rounded-xl focus-visible:ring-1 focus-visible:ring-white/10 transition-all placeholder:text-zinc-600" />
+                      className="bg-white/[0.03] border-white/5 text-white h-12! px-4! rounded-xl focus-visible:ring-1 focus-visible:ring-white/10 transition-all placeholder:text-zinc-600" />
                   </Field>
                 </div>
 
-                <div className="flex flex-col gap-4 mt-4">
-                  <Button type="submit" className="w-full bg-white hover:bg-zinc-200 text-black h-12 font-bold rounded-full transition-all active:scale-[0.98] shadow-xl" disabled={loading}>
+                <div className="flex flex-col gap-4! mt-4!">
+                  <Button type="submit" className="w-full bg-white hover:bg-zinc-200 text-black h-12! font-bold rounded-full transition-all active:scale-[0.98] shadow-xl" disabled={loading}>
                     {loading ? 'Creating account...' : 'Create Account'}
                   </Button>
                   <button type="button"
-                    className="w-full h-12 flex items-center justify-center gap-3 rounded-full border border-white/10 bg-white/[0.03] text-white font-bold transition-all duration-300 hover:bg-white hover:text-black hover:border-white hover:shadow-[0_0_30px_rgba(255,255,255,0.25)] active:scale-[0.98]"
+                    className="w-full h-12! flex items-center justify-center gap-3! rounded-full border border-white/10 bg-white/[0.03] text-white font-bold transition-all duration-300 hover:bg-white hover:text-black hover:border-white hover:shadow-[0_0_30px_rgba(255,255,255,0.25)] active:scale-[0.98]"
                     onClick={() => signIn('google', { callbackUrl: `/dashboard/${role}` })}
                   >
                     <GoogleLogo className="w-5 h-5 transition-colors group-hover:text-black" />
