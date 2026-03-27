@@ -7,7 +7,9 @@ import UserAISession from '@/models/UserAISession';
 import User from '@/models/User';
 import Doctor from '@/models/Doctor';
 import Appointment from '@/models/Appointment';
+import BookingLock from '@/models/BookingLock';
 import { OCCUPYING_APPOINTMENT_STATUSES } from '@/lib/appointmentStatus';
+import { getSlotKeysForTimeLabel } from '@/lib/bookingTime';
 
 export async function POST(request) {
   try {
@@ -107,32 +109,50 @@ export async function POST(request) {
       if (parsed.params?.date && (parsed.params?.timeSlot || parsed.params?.time)) {
         try {
           const timeToSearch = parsed.params.timeSlot || parsed.params.time;
-          const existing = await Appointment.findOne({
-            date: parsed.params.date,
-            timeSlot: timeToSearch,
-            status: { $in: OCCUPYING_APPOINTMENT_STATUSES },
-            $or: [
-              { patientId: user.id || session.userId },
-              { doctorId: parsed.params.doctorId }
-            ]
-          }).populate({ path: 'doctorId', populate: { path: 'userId', select: 'name' } });
+          const candidateSlotKeys = getSlotKeysForTimeLabel(timeToSearch);
           
-          if (existing) {
-             const isSamePatient = existing.patientId?.toString() === (user.id || session.userId);
-             if (isSamePatient) {
-                const isSameDoc = existing.doctorId?._id?.toString() === parsed.params.doctorId?.toString();
-                if (isSameDoc) {
-                  parsed.reply = `You already have an appointment with ${parsed.params.doctorName || 'this doctor'} at this time (${parsed.params.date} at ${timeToSearch})! Would you like to view your appointments?`;
-                } else {
-                  const otherDocName = existing.doctorId?.userId?.name || 'another doctor';
-                  parsed.reply = `You already have a conflicting appointment with ${otherDocName} at this time (${parsed.params.date} at ${timeToSearch})! Would you like to book a different time?`;
-                }
-             } else if (existing.doctorId?._id?.toString() === parsed.params.doctorId?.toString()) {
-                // Someone ELSE booked THIS doctor
-                parsed.reply = `I'm sorry, but another user has already booked ${parsed.params.doctorName || 'this doctor'} for ${parsed.params.date} at ${timeToSearch}. Please pick another slot!`;
-             }
-             
-             if (parsed.reply) parsed.intent = 'ALREADY_BOOKED';
+          if (candidateSlotKeys.length > 0) {
+            const [existingApp, existingLock] = await Promise.all([
+              Appointment.findOne({
+                date: parsed.params.date,
+                slotKeys: { $in: candidateSlotKeys },
+                status: { $in: OCCUPYING_APPOINTMENT_STATUSES },
+                $or: [
+                  { patientId: user.id || session.userId },
+                  { doctorId: parsed.params.doctorId }
+                ]
+              }).populate({ path: 'doctorId', populate: { path: 'userId', select: 'name' } }),
+              
+              BookingLock.findOne({
+                date: parsed.params.date,
+                slotKeys: { $in: candidateSlotKeys },
+                expiresAt: { $gt: new Date() },
+                $or: [
+                  { patientId: user.id || session.userId },
+                  { doctorId: parsed.params.doctorId }
+                ]
+              }).populate({ path: 'doctorId', populate: { path: 'userId', select: 'name' } })
+            ]);
+            
+            const existing = existingApp || existingLock;
+            
+            if (existing) {
+               const isSamePatient = existing.patientId?.toString() === (user.id || session.userId);
+               if (isSamePatient) {
+                  const isSameDoc = (existing.doctorId?._id || existing.doctorId)?.toString() === parsed.params.doctorId?.toString();
+                  if (isSameDoc) {
+                    parsed.reply = `You already have an appointment (or a pending lock) with ${parsed.params.doctorName || 'this doctor'} that overlaps with ${timeToSearch} on ${parsed.params.date}!`;
+                  } else {
+                    const otherDocName = existing.doctorId?.userId?.name || 'another doctor';
+                    parsed.reply = `You already have a conflicting appointment with ${otherDocName} that overlaps with ${timeToSearch} on ${parsed.params.date}!`;
+                  }
+               } else {
+                  // Someone ELSE booked THIS doctor
+                  parsed.reply = `I'm sorry, but another user has already booked ${parsed.params.doctorName || 'this doctor'} for a window that overlaps with ${timeToSearch} on ${parsed.params.date}. Please pick another time!`;
+               }
+               
+               if (parsed.reply) parsed.intent = 'ALREADY_BOOKED';
+            }
           }
         } catch (dbErr) {
           console.error('Appointment conflict check error:', dbErr);

@@ -13,7 +13,8 @@ import {
   Mic,
   Trash2,
   Activity,
-  Send
+  Send,
+  AlertCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAgent } from '@/context/AgentContext';
@@ -219,42 +220,8 @@ export default function AIAgentWidget() {
       const res = await fetch(`/api/doctors/${docId}?date=${encodeURIComponent(date)}`);
       const data = await res.json();
       
-      // Filter slots that are actually available
-      const allSlots = Object.keys(data.slotStates || {}).length > 0 
-        ? Object.keys(data.slotStates) 
-        : []; // This is tricky, we need a list of ALL possible slots to filter
-      
-      // Let's use a simpler approach: get all slots from DEFAULT_TIME_WINDOWS logic
-      const slotStates = data.slotStates || {};
-      const now = new Date();
-      const isToday = date === toYYYYMMDD(now);
-
-      // Generate all 24-hour slots (1-hour increments)
-      const allDaySlots = [];
-      for (let h = 0; h < 24; h++) {
-        let displayHour = h % 12;
-        if (displayHour === 0) displayHour = 12;
-        const meridiem = h < 12 ? "AM" : "PM";
-        allDaySlots.push(`${String(displayHour).padStart(2, '0')}:00 ${meridiem}`);
-      }
-      
-      const available = allDaySlots.filter(slot => {
-        const state = slotStates[slot] || 'available';
-        if (state !== 'available') return false;
-        if (isToday) {
-            // Check if slot is in the future (simple hour check)
-            const [time, meridiem] = slot.split(' ');
-            let [h, m] = time.split(':').map(Number);
-            if (meridiem === 'PM' && h !== 12) h += 12;
-            if (meridiem === 'AM' && h === 12) h = 0;
-            const slotDate = new Date(date);
-            slotDate.setHours(h, m, 0);
-            return slotDate > now;
-        }
-        return true;
-      });
-      
-      setAvailableSlots(available);
+      // We take ALL slot states from the backend for the whole day
+      setAvailableSlots({ allStates: data.slotStates || {} });
     } catch (err) {
       toast.error("Failed to load slots");
     } finally {
@@ -570,30 +537,12 @@ export default function AIAgentWidget() {
                                     <ChevronDown size={18} className={`transition-transform duration-300 ${activeSlotPickerId === m.id ? 'rotate-180' : ''}`} />
                                   </button>
                                   
-                                  {activeSlotPickerId === m.id && availableSlots.length > 0 && (
-                                    <motion.div 
-                                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                                      className="absolute left-0 top-full mt-4 w-72 max-h-80 overflow-y-auto bg-zinc-900/95 backdrop-blur-3xl border border-white/10 rounded-2xl p-4 z-[300] shadow-[0_20px_50px_rgba(0,0,0,0.5)] custom-scrollbar"
-                                    >
-                                      <div className="grid grid-cols-1 gap-2">
-                                        {availableSlots.map((slot) => (
-                                          <button 
-                                            key={slot}
-                                            onClick={() => handleSlotSelect(slot, m.action.payload, m.id)}
-                                            className="w-full px-6 py-4 text-left text-white/60 hover:text-white hover:bg-white/5 rounded-xl transition-all font-medium border border-transparent hover:border-white/5"
-                                          >
-                                            {slot}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </motion.div>
-                                  )}
-                                  
-                                  {activeSlotPickerId === m.id && !fetchingSlots && availableSlots.length === 0 && (
-                                    <div className="absolute left-0 top-full mt-4 w-72 p-6 bg-zinc-900/95 backdrop-blur-3xl border border-white/10 rounded-2xl text-white/30 text-sm font-medium">
-                                      No slots available for this date.
-                                    </div>
+                                  {activeSlotPickerId === m.id && (
+                                    <TimeDialPicker 
+                                      slotStates={availableSlots.allStates || {}} 
+                                      onSelect={(slot) => handleSlotSelect(slot, m.action.payload, m.id)}
+                                      onCancel={() => setActiveSlotPickerId(null)}
+                                    />
                                   )}
                                 </div>
                               </div>
@@ -758,5 +707,93 @@ export default function AIAgentWidget() {
         }
       `}</style>
     </>
+  );
+}
+function TimeDialPicker({ slotStates, onSelect, onCancel }) {
+  const [hour, setHour] = useState(9);
+  const [minute, setMinute] = useState(0);
+  const [period, setPeriod] = useState('AM');
+
+  const selectedTimeLabel = `${String(hour === 0 ? 12 : hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${period}`;
+
+  const isRangeAvailable = (startTime) => {
+    // Check 60 minutes sequence
+    let h = hour;
+    if (period === 'PM' && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    
+    const startTotal = h * 60 + minute;
+    
+    for (let i = 0; i < 60; i++) {
+        const currentTotal = startTotal + i;
+        if (currentTotal >= 1440) return false; // Past midnight
+        
+        const curH24 = Math.floor(currentTotal / 60);
+        const curM = currentTotal % 60;
+        const curH12 = curH24 % 12 || 12;
+        const curPeriod = curH24 >= 12 ? 'PM' : 'AM';
+        const label = `${String(curH12).padStart(2, '0')}:${String(curM).padStart(2, '0')} ${curPeriod}`;
+        
+        if (slotStates[label]) return false;
+    }
+    return true;
+  };
+
+  const available = isRangeAvailable(selectedTimeLabel);
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 15, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      className="absolute left-0 top-full mt-6 w-[340px] bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 z-[300] shadow-[0_32px_64px_rgba(0,0,0,0.6)]"
+    >
+      <div className="flex justify-between items-center mb-6">
+        <h4 className="text-white/40 text-xs font-black uppercase tracking-[0.2em]">Select Time</h4>
+        <button onClick={onCancel} className="text-white/20 hover:text-white transition-colors"><X size={16}/></button>
+      </div>
+
+      <div className="flex items-center justify-center gap-4 mb-8 h-40 overflow-hidden relative">
+        {/* HOUR */}
+        <div className="flex flex-col items-center w-16 overflow-y-auto no-scrollbar snap-y snap-mandatory" style={{ height: '100%' }}>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                <div key={h} onClick={() => setHour(h)} className={`h-12 shrink-0 flex items-center justify-center text-3xl font-black cursor-pointer snap-center transition-all ${hour === h ? 'text-sky-400 scale-125' : 'text-white/10 hover:text-white/40'}`}>
+                    {String(h).padStart(2, '0')}
+                </div>
+            ))}
+        </div>
+        <div className="text-white/10 text-3xl font-black mb-1">:</div>
+        {/* MINUTE */}
+        <div className="flex flex-col items-center w-16 overflow-y-auto no-scrollbar snap-y snap-mandatory" style={{ height: '100%' }}>
+            {Array.from({ length: 60 }, (_, i) => i).map(m => (
+                <div key={m} onClick={() => setMinute(m)} className={`h-12 shrink-0 flex items-center justify-center text-3xl font-black cursor-pointer snap-center transition-all ${minute === m ? 'text-sky-400 scale-125' : 'text-white/10 hover:text-white/40'}`}>
+                    {String(m).padStart(2, '0')}
+                </div>
+            ))}
+        </div>
+        {/* PERIOD */}
+        <div className="flex flex-col items-center w-20 justify-center gap-4">
+            {['AM', 'PM'].map(p => (
+                <div key={p} onClick={() => setPeriod(p)} className={`text-xl font-bold cursor-pointer transition-all ${period === p ? 'text-sky-400' : 'text-white/10 hover:text-white/40'}`}>
+                    {p}
+                </div>
+            ))}
+        </div>
+      </div>
+
+      <div className={`p-4 rounded-2xl flex items-center gap-3 mb-6 transition-all border ${available ? 'bg-sky-500/5 border-sky-500/10 text-sky-400' : 'bg-red-500/5 border-red-500/10 text-red-400'}`}>
+        {available ? <Check size={18} /> : <AlertCircle size={18} />}
+        <span className="text-sm font-bold tracking-tight">
+            {available ? 'This slot is available' : 'This slot is already booked'}
+        </span>
+      </div>
+
+      <button
+        disabled={!available}
+        onClick={() => onSelect(selectedTimeLabel)}
+        className={`w-full h-14 rounded-2xl font-black text-sm uppercase tracking-[0.2em] transition-all ${available ? 'bg-sky-500 text-white shadow-[0_8px_25px_rgba(56,189,248,0.4)] hover:scale-[1.02] active:scale-95' : 'bg-white/5 text-white/10 cursor-not-allowed'}`}
+      >
+        Confirm Selection
+      </button>
+    </motion.div>
   );
 }
